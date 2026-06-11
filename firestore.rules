@@ -1,0 +1,142 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helpers
+    function isSignedIn() { return request.auth != null; }
+    function uid() { return request.auth.uid; }
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+    function isDoctorOf(doctorId) {
+      return isSignedIn() && request.auth.token.doctorId == doctorId;
+    }
+
+    // ---------- doctors ----------
+    // Public read for landing pages; only Cloud Functions write.
+    match /doctors/{doctorId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // ---------- users ----------
+    // Patients see only their own profile; admins see all.
+    match /users/{userId} {
+      allow read: if isSignedIn() && (uid() == userId || isAdmin());
+      // Creation/update happens via the server (Razorpay verify route uses Admin SDK
+      // which bypasses rules); patients can update their own basic fields.
+      allow update: if isSignedIn() && uid() == userId
+        && !('role' in request.resource.data.diff(resource.data).affectedKeys());
+      allow create: if false; // server-side only
+      allow delete: if false;
+    }
+
+    // ---------- appointments ----------
+    match /appointments/{apptId} {
+      allow read: if isSignedIn() && (
+        resource.data.patientId == uid() ||
+        isDoctorOf(resource.data.doctorId) ||
+        isAdmin()
+      );
+      // Patients cannot directly create appointments — must go via verify route (Admin SDK).
+      allow create: if false;
+      // Doctor may add notes / mark completed.
+      allow update: if isSignedIn() && (
+        (isDoctorOf(resource.data.doctorId) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+            ['doctorNotes', 'status', 'updatedAt']
+          )) ||
+        isAdmin()
+      );
+      allow delete: if false;
+    }
+
+    // ---------- availability ----------
+    match /availability_templates/{tmplId} {
+      allow read: if true;
+      allow write: if isSignedIn() && (
+        isDoctorOf(request.resource.data.doctorId) || isAdmin()
+      );
+    }
+    // Date-specific schedule overrides (e.g. one Monday differs from the weekly default).
+    match /availability_overrides/{overrideId} {
+      allow read: if true;
+      allow write: if isSignedIn() && (
+        isDoctorOf(request.resource.data.doctorId) || isAdmin() ||
+        // allow deleting an override (request.resource is null on delete)
+        (request.resource == null && (isAdmin() || isDoctorOf(resource.data.doctorId)))
+      );
+    }
+    match /availability_instances/{slotId} {
+      allow read: if true;
+      // Only Admin SDK / Functions write (booking transaction); doctors can set source=manual.
+      allow create, update: if isSignedIn() && (
+        isDoctorOf(request.resource.data.doctorId) || isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+    match /slot_locks/{lockId} {
+      // Locks are server-side only.
+      allow read, write: if false;
+    }
+
+    // ---------- chat ----------
+    function chatParticipant(sessionId) {
+      let session = get(/databases/$(database)/documents/chat_sessions/$(sessionId)).data;
+      return isSignedIn() && (
+        session.patientId == uid() ||
+        isDoctorOf(session.doctorId) ||
+        isAdmin()
+      );
+    }
+    function chatActive(sessionId) {
+      let session = get(/databases/$(database)/documents/chat_sessions/$(sessionId)).data;
+      // Grace window: 5 min before start, 5 min after end.
+      return request.time.toMillis() >= session.startTime - 5 * 60 * 1000
+        && request.time.toMillis() <= session.endTime + 5 * 60 * 1000;
+    }
+    match /chat_sessions/{sessionId} {
+      allow read: if chatParticipant(sessionId);
+      allow update: if chatParticipant(sessionId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'transcriptUrl']);
+      allow create, delete: if false;
+
+      match /messages/{messageId} {
+        allow read: if chatParticipant(sessionId);
+        allow create: if chatParticipant(sessionId) && chatActive(sessionId)
+          && request.resource.data.senderId == uid();
+        allow update, delete: if false;
+      }
+    }
+
+    // ---------- documents ----------
+    match /documents/{docId} {
+      allow read: if isSignedIn() && (
+        resource.data.patientId == uid() ||
+        isAdmin() ||
+        (resource.data.appointmentId != null &&
+          isDoctorOf(get(/databases/$(database)/documents/appointments/$(resource.data.appointmentId)).data.doctorId))
+      );
+      allow create: if isSignedIn() && request.resource.data.patientId == uid();
+      allow update, delete: if isAdmin();
+    }
+
+    // ---------- prescriptions ----------
+    match /prescriptions/{rxId} {
+      allow read: if isSignedIn() && (
+        resource.data.patientId == uid() ||
+        isDoctorOf(resource.data.doctorId) ||
+        isAdmin()
+      );
+      allow create, update: if isSignedIn() && isDoctorOf(request.resource.data.doctorId);
+      allow delete: if false;
+    }
+
+    // ---------- audit ----------
+    match /audit_logs/{logId} {
+      allow read: if isAdmin() || (isSignedIn() && request.auth.token.doctorId != null);
+      // Server-side only via Admin SDK.
+      allow create, update, delete: if false;
+    }
+  }
+}

@@ -1,0 +1,26 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Patients upload to /uploads/{patientUid}/...
+    match /uploads/{patientUid}/{allPaths=**} {
+      allow read: if request.auth != null && (
+        request.auth.uid == patientUid ||
+        request.auth.token.admin == true ||
+        request.auth.token.doctorId != null
+      );
+      allow write: if request.auth != null && request.auth.uid == patientUid
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*|application/pdf');
+    }
+    // Generated prescription PDFs.
+    match /prescriptions/{doctorId}/{file=**} {
+      allow read: if request.auth != null;
+      allow write: if false; // server-side only
+    }
+    // Chat transcripts.
+    match /transcripts/{sessionId}/{file=**} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+  }
+}
