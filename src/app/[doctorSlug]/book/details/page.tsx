@@ -33,6 +33,9 @@ export default function BookDetailsPage() {
     }
   }, [user, form.phone]);
 
+  // If the patient logged in with a phone number, it's their verified number — lock the field.
+  const lockedPhone = Boolean(user?.phoneNumber);
+
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((form.email ?? '').trim());
   const phoneValid = (form.phone ?? '').replace(/\D/g, '').length >= 10;
   const canContinue = Boolean((form.complaint ?? '').trim()) && emailValid && phoneValid;
@@ -124,9 +127,11 @@ export default function BookDetailsPage() {
               value={form.phone}
               onChange={(e) => setForm({ ...form, phone: e.target.value })}
               placeholder="+91 98765 43210"
+              readOnly={lockedPhone}
+              style={lockedPhone ? { background: 'var(--surface-2)', color: 'var(--ink-2)' } : undefined}
             />
             <div style={{ color: 'var(--ink-3)', fontSize: 12, marginTop: 4 }}>
-              Used for appointment reminders.
+              {lockedPhone ? 'Verified at login.' : 'Used for appointment reminders.'}
             </div>
           </div>
         </div>
