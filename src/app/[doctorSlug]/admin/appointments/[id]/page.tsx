@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore';
 import { useAuth } from '@/components/AuthProvider';
 import { useDoctor } from '@/components/DoctorProvider';
+import { useConsultAlert } from '@/components/admin/ConsultAlert';
 import { Avatar } from '@/components/ui/Avatar';
 import { Chip } from '@/components/ui/Chip';
 import { Icon } from '@/components/ui/Icon';
@@ -26,11 +27,20 @@ export default function AdminAppointmentDetail() {
   const router = useRouter();
   const { user } = useAuth();
   const { id } = useParams<{ id: string }>();
+  const { setAlert } = useConsultAlert();
   const [appt, setAppt] = useState<AppointmentDoc | null>(null);
   const [messages, setMessages] = useState<ChatMessageDoc[]>([]);
   const [draft, setDraft] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const [extending, setExtending] = useState(false);
   const endRef = useRef<HTMLDivElement | null>(null);
+
+  // Tick every second so the countdown + 5-min warning update live.
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -57,11 +67,40 @@ export default function AdminAppointmentDetail() {
 
   const status: 'before' | 'active' | 'closed' = useMemo(() => {
     if (!appt) return 'before';
-    const now = Date.now();
     if (now < appt.startTime) return 'before';
     if (now >= appt.endTime) return 'closed';
     return 'active';
-  }, [appt]);
+  }, [appt, now]);
+
+  const msLeft = appt && status === 'active' ? appt.endTime - now : 0;
+  const endingSoon = status === 'active' && msLeft > 0 && msLeft <= 5 * 60 * 1000;
+
+  // Drive the red sidebar warning when <5 min remain on an active consult.
+  useEffect(() => {
+    setAlert(endingSoon);
+    return () => setAlert(false);
+  }, [endingSoon, setAlert]);
+
+  const mmss = (ms: number) => {
+    const s = Math.max(0, Math.floor(ms / 1000));
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  };
+
+  const extend = async () => {
+    if (!appt || !user) return;
+    setExtending(true);
+    try {
+      const token = await user.getIdToken();
+      await fetch('/api/consult/extend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ appointmentId: appt.id }),
+      });
+      // appt.endTime refreshes via the onSnapshot listener.
+    } finally {
+      setExtending(false);
+    }
+  };
 
   const send = async () => {
     if (!appt || !user || !draft.trim()) return;
@@ -138,11 +177,28 @@ export default function AdminAppointmentDetail() {
             <Icon name="chat" size={15} />
             <span style={{ fontSize: 14, fontWeight: 500, marginLeft: 8 }}>Web chat</span>
             <div className="spacer" style={{ flex: 1 }} />
-            {status === 'before' && (
-              <Chip>Opens {fmtTime(appt.startTime, doctor.timezone)}</Chip>
+            {status === 'before' && <Chip>Opens {fmtTime(appt.startTime, doctor.timezone)}</Chip>}
+            {status === 'active' && (
+              <div className="row" style={{ gap: 8 }}>
+                <span
+                  className="mono"
+                  style={{ fontSize: 13, fontWeight: 600, color: endingSoon ? '#e5484d' : 'var(--ink-2)' }}
+                >
+                  {mmss(msLeft)} left
+                </span>
+                <button className="btn btn-secondary btn-sm" onClick={extend} disabled={extending}>
+                  {extending ? '…' : '+5 min'}
+                </button>
+              </div>
             )}
-            {status === 'active' && <Chip variant="live" dot>Live · ends {fmtTime(appt.endTime, doctor.timezone)}</Chip>}
-            {status === 'closed' && <Chip>Closed</Chip>}
+            {status === 'closed' && (
+              <div className="row" style={{ gap: 8 }}>
+                <Chip>Closed</Chip>
+                <button className="btn btn-secondary btn-sm" onClick={extend} disabled={extending}>
+                  {extending ? '…' : 'Reopen +5 min'}
+                </button>
+              </div>
+            )}
           </div>
 
           <div style={{ flex: 1, overflowY: 'auto', padding: 18, display: 'flex', flexDirection: 'column', gap: 10, background: 'var(--surface-2)' }}>
