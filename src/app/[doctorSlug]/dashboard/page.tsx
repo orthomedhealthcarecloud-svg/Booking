@@ -168,7 +168,9 @@ export default function PatientDashboard() {
                     <td>{a.chiefComplaint}</td>
                     <td className="mono">{a.amountPaid ? fmtMoney(a.amountPaid) : '—'}</td>
                     <td style={{ textAlign: 'right' }}>
-                      <button className="btn btn-ghost btn-sm">View →</button>
+                      <Link href={`/${doctor.slug}/consult/${a.id}`} className="btn btn-ghost btn-sm">
+                        View →
+                      </Link>
                     </td>
                   </tr>
                 ))}
