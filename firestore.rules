@@ -132,6 +132,16 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ---------- medicines (doctor's reusable catalog) ----------
+    match /medicines/{medId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && (
+        isAdmin() ||
+        (request.resource != null && isDoctorOf(request.resource.data.doctorId)) ||
+        (request.resource == null && isDoctorOf(resource.data.doctorId))
+      );
+    }
+
     // ---------- audit ----------
     match /audit_logs/{logId} {
       allow read: if isAdmin() || (isSignedIn() && request.auth.token.doctorId != null);

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { useDoctor } from '@/components/DoctorProvider';
 import { Avatar } from '@/components/ui/Avatar';
@@ -21,6 +22,7 @@ type Aggregated = {
 
 export default function PatientsPage() {
   const doctor = useDoctor();
+  const router = useRouter();
   const [rows, setRows] = useState<Aggregated[]>([]);
   const [search, setSearch] = useState('');
 
@@ -106,14 +108,18 @@ export default function PatientsPage() {
               <tr>
                 <th>Patient</th>
                 <th>Contact</th>
-                <th>Last complaint</th>
                 <th>Visits</th>
                 <th>Last seen</th>
+                <th />
               </tr>
             </thead>
             <tbody>
               {filtered.map((r) => (
-                <tr key={r.patientId}>
+                <tr
+                  key={r.patientId}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => router.push(`/${doctor.slug}/admin/patients/${r.patientId}`)}
+                >
                   <td>
                     <div className="row" style={{ gap: 10 }}>
                       <Avatar name={r.name || r.patientId} size="sm" />
@@ -127,10 +133,12 @@ export default function PatientsPage() {
                     )}
                     {!r.phone && !r.email && '—'}
                   </td>
-                  <td style={{ color: 'var(--ink-2)' }}>{r.lastComplaint}</td>
                   <td className="mono">{r.visits}</td>
                   <td className="mono" style={{ color: 'var(--ink-2)', fontSize: 13 }}>
                     {fmtDate(r.lastSeen, doctor.timezone)}
+                  </td>
+                  <td style={{ textAlign: 'right', color: 'var(--ink-3)' }}>
+                    <Icon name="chevronRight" size={16} />
                   </td>
                 </tr>
               ))}

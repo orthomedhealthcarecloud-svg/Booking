@@ -9,7 +9,7 @@ import {
 } from 'react';
 import type { ConsultationType } from '@/lib/types';
 
-export type BookingFiles = { name: string; size: string }[];
+export type BookingFiles = { name: string; size: string; url?: string; docId?: string }[];
 
 export type BookingDraft = {
   type: ConsultationType;

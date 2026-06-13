@@ -1,194 +1,187 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import {
+  addDoc,
+  collection,
+  doc,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+} from 'firebase/firestore';
+import { useAuth } from '@/components/AuthProvider';
 import { useDoctor } from '@/components/DoctorProvider';
 import { Avatar } from '@/components/ui/Avatar';
 import { Chip } from '@/components/ui/Chip';
 import { Icon } from '@/components/ui/Icon';
-import { Row } from '@/components/ui/Row';
 import { firestore } from '@/lib/firebase/client';
-import { fmtMoney, fmtTime } from '@/lib/format';
-import type { AppointmentDoc } from '@/lib/types';
+import { fmtTime } from '@/lib/format';
+import type { AppointmentDoc, ChatMessageDoc } from '@/lib/types';
 
 export default function AdminAppointmentDetail() {
   const doctor = useDoctor();
   const router = useRouter();
+  const { user } = useAuth();
   const { id } = useParams<{ id: string }>();
   const [appt, setAppt] = useState<AppointmentDoc | null>(null);
-  const [notes, setNotes] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [messages, setMessages] = useState<ChatMessageDoc[]>([]);
+  const [draft, setDraft] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const endRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!id) return;
     const unsub = onSnapshot(doc(firestore(), 'appointments', id), (s) => {
-      if (s.exists()) {
-        const data = { id: s.id, ...(s.data() as Omit<AppointmentDoc, 'id'>) };
-        setAppt(data);
-        setNotes(data.doctorNotes ?? '');
-      }
+      if (s.exists()) setAppt({ id: s.id, ...(s.data() as Omit<AppointmentDoc, 'id'>) });
     });
     return () => unsub();
   }, [id]);
 
-  const saveNotes = async () => {
-    if (!appt) return;
-    setSaving(true);
+  useEffect(() => {
+    if (!id || !appt || appt.type !== 'text') return;
+    const q = query(
+      collection(firestore(), 'chat_sessions', id, 'messages'),
+      orderBy('createdAt', 'asc'),
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      const rows: ChatMessageDoc[] = [];
+      snap.forEach((d) => rows.push({ id: d.id, ...(d.data() as Omit<ChatMessageDoc, 'id'>) }));
+      setMessages(rows);
+      setTimeout(() => endRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+    });
+    return () => unsub();
+  }, [id, appt]);
+
+  const status: 'before' | 'active' | 'closed' = useMemo(() => {
+    if (!appt) return 'before';
+    const now = Date.now();
+    if (now < appt.startTime) return 'before';
+    if (now >= appt.endTime) return 'closed';
+    return 'active';
+  }, [appt]);
+
+  const send = async () => {
+    if (!appt || !user || !draft.trim()) return;
+    const text = draft;
+    setDraft('');
+    setError(null);
     try {
-      await updateDoc(doc(firestore(), 'appointments', appt.id), {
-        doctorNotes: notes,
-        updatedAt: Date.now(),
+      await addDoc(collection(firestore(), 'chat_sessions', appt.id, 'messages'), {
+        senderId: user.uid,
+        senderRole: 'doctor',
+        text,
+        createdAt: serverTimestamp(),
       });
-    } finally {
-      setSaving(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not send');
+      setDraft(text);
     }
   };
 
   if (!appt) return <div style={{ padding: 40, color: 'var(--ink-3)' }}>Loading…</div>;
-  const isLive = appt.startTime <= Date.now() && appt.endTime > Date.now();
+  const joinable = Date.now() >= appt.startTime - 5 * 60 * 1000 && Date.now() < appt.endTime;
 
   return (
-    <div data-screen-label="Appointment Detail">
-      <div className="row" style={{ marginBottom: 18 }}>
-        <button className="btn btn-ghost btn-sm" onClick={() => router.push(`/${doctor.slug}/admin`)}>
-          <Icon name="chevronLeft" size={14} /> Back
+    <div data-screen-label="Consultation" style={{ maxWidth: 820 }}>
+      <div className="row" style={{ justifyContent: 'space-between', marginBottom: 16 }}>
+        <button className="btn btn-ghost btn-sm" onClick={() => router.push(`/${doctor.slug}/admin/appointments`)}>
+          <Icon name="chevronLeft" size={14} /> Consultations
         </button>
-        <span className="mono" style={{ color: 'var(--ink-3)', fontSize: 13, marginLeft: 6 }}>
-          {appt.id}
-        </span>
+        <Link href={`/${doctor.slug}/admin/patients/${appt.patientId}`} className="btn btn-ghost btn-sm">
+          Open patient file <Icon name="chevronRight" size={14} />
+        </Link>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 24 }}>
-        <div>
-          <div className="card" style={{ marginBottom: 22, padding: 22 }}>
-            <div className="row" style={{ gap: 16, marginBottom: 6 }}>
-              <Avatar name={appt.patientName || 'Patient'} size="lg" />
-              <div style={{ flex: 1 }}>
-                <div className="row" style={{ gap: 10, marginBottom: 4 }}>
-                  <h2 style={{ fontSize: 22 }}>
-                    {appt.patientName || `Patient #${appt.patientId.slice(0, 6)}`}
-                  </h2>
-                  {isLive && (
-                    <Chip variant="live" dot>
-                      Live
-                    </Chip>
-                  )}
-                </div>
-                <div style={{ color: 'var(--ink-3)', fontSize: 14 }}>
-                  {appt.patientAge ? `${appt.patientAge} y · ` : ''}
-                  {appt.patientGender || ''} ·{' '}
-                  <span className="mono">
-                    {fmtTime(appt.startTime, doctor.timezone)} – {fmtTime(appt.endTime, doctor.timezone)}
-                  </span>{' '}
-                  · {appt.type === 'video' ? 'Video' : 'Text'}
-                </div>
-              </div>
-              {appt.type === 'video' && appt.meetUrl ? (
-                <a href={appt.meetUrl} target="_blank" rel="noreferrer" className="btn btn-primary">
-                  <Icon name="video" size={16} /> Open Google Meet
-                </a>
-              ) : (
-                <Link
-                  href={`/${doctor.slug}/admin/chat/${appt.id}`}
-                  className="btn btn-primary"
-                >
-                  <Icon name="chat" size={16} /> Open chat
-                </Link>
-              )}
+      {/* Patient + action */}
+      <div className="card" style={{ padding: 22, marginBottom: 18 }}>
+        <div className="row" style={{ gap: 16 }}>
+          <Avatar name={appt.patientName || 'Patient'} size="lg" />
+          <div style={{ flex: 1 }}>
+            <div className="row" style={{ gap: 10 }}>
+              <h2 style={{ fontSize: 20 }}>{appt.patientName || `Patient #${appt.patientId.slice(0, 6)}`}</h2>
+              {status === 'active' && <Chip variant="live" dot>Live</Chip>}
+            </div>
+            <div style={{ color: 'var(--ink-3)', fontSize: 14 }}>
+              {appt.patientAge ? `${appt.patientAge} y · ` : ''}
+              {appt.patientGender || ''} ·{' '}
+              <span className="mono">{fmtTime(appt.startTime, doctor.timezone)}</span> ·{' '}
+              {appt.type === 'video' ? 'Video' : 'Text'} · {appt.chiefComplaint}
             </div>
           </div>
-
-          <div className="card" style={{ marginBottom: 22 }}>
-            <div className="eyebrow" style={{ marginBottom: 10 }}>
-              Chief complaint
-            </div>
-            <div style={{ fontSize: 16, marginBottom: 18 }}>{appt.chiefComplaint}</div>
-            <div className="eyebrow" style={{ marginBottom: 10 }}>
-              Patient notes
-            </div>
-            <div style={{ fontSize: 15, color: 'var(--ink-2)', lineHeight: 1.55 }}>
-              {appt.notesForDoctor || '—'}
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="row" style={{ justifyContent: 'space-between', marginBottom: 14 }}>
-              <div className="eyebrow">Doctor&apos;s notes (private)</div>
-              {saving && (
-                <span className="mono" style={{ fontSize: 12, color: 'var(--ink-3)' }}>
-                  saving…
-                </span>
-              )}
-            </div>
-            <textarea
-              className="textarea"
-              style={{ minHeight: 160 }}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              onBlur={saveNotes}
-            />
-            <div className="row" style={{ marginTop: 14, justifyContent: 'space-between' }}>
-              <button className="btn btn-secondary" onClick={saveNotes}>
-                Save
+          {appt.type === 'video' &&
+            (joinable && appt.meetUrl ? (
+              <a href={appt.meetUrl} target="_blank" rel="noreferrer" className="btn btn-primary">
+                <Icon name="video" size={16} /> Join Google Meet
+              </a>
+            ) : (
+              <button className="btn btn-secondary" disabled>
+                {Date.now() >= appt.endTime ? 'Ended' : `Opens ${fmtTime(appt.startTime, doctor.timezone)}`}
               </button>
-              <Link
-                href={`/${doctor.slug}/admin/prescriptions/${appt.id}`}
-                className="btn btn-primary"
-              >
-                <Icon name="pill" size={16} /> Write prescription
-              </Link>
-            </div>
-          </div>
+            ))}
         </div>
-
-        <aside>
-          <div className="card" style={{ marginBottom: 16 }}>
-            <div className="eyebrow" style={{ marginBottom: 14 }}>
-              Appointment
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 14 }}>
-              <Row
-                k="Mode"
-                v={
-                  <Chip>
-                    <Icon name={appt.type === 'video' ? 'video' : 'chat'} size={12} />{' '}
-                    {appt.type === 'video' ? 'Video' : 'Text'}
-                  </Chip>
-                }
-              />
-              <Row
-                k="Slot"
-                v={
-                  <span className="mono">
-                    {fmtTime(appt.startTime, doctor.timezone)}
-                  </span>
-                }
-              />
-              <Row k="Duration" v="30 min" />
-              <Row
-                k="Payment"
-                v={
-                  <Chip variant={appt.paymentStatus === 'paid' ? 'ok' : 'warn'} dot>
-                    {appt.paymentStatus === 'paid'
-                      ? `Paid · ${fmtMoney(appt.amountPaid ?? 0)}`
-                      : appt.paymentStatus}
-                  </Chip>
-                }
-              />
-              <Row
-                k="Status"
-                v={
-                  <Chip variant={appt.status === 'completed' ? 'ok' : 'default'} dot>
-                    {appt.status}
-                  </Chip>
-                }
-              />
-            </div>
-          </div>
-        </aside>
       </div>
+
+      {/* Web chat for text consults */}
+      {appt.type === 'text' && (
+        <div className="card" style={{ padding: 0, display: 'flex', flexDirection: 'column', height: 460 }}>
+          <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--line)' }} className="row">
+            <Icon name="chat" size={15} />
+            <span style={{ fontSize: 14, fontWeight: 500, marginLeft: 8 }}>Web chat</span>
+            <div className="spacer" style={{ flex: 1 }} />
+            {status === 'before' && (
+              <Chip>Opens {fmtTime(appt.startTime, doctor.timezone)}</Chip>
+            )}
+            {status === 'active' && <Chip variant="live" dot>Live · ends {fmtTime(appt.endTime, doctor.timezone)}</Chip>}
+            {status === 'closed' && <Chip>Closed</Chip>}
+          </div>
+
+          <div style={{ flex: 1, overflowY: 'auto', padding: 18, display: 'flex', flexDirection: 'column', gap: 10, background: 'var(--surface-2)' }}>
+            {messages.length === 0 && (
+              <div style={{ alignSelf: 'center', color: 'var(--ink-3)', fontSize: 13 }}>No messages yet.</div>
+            )}
+            {messages.map((m) => {
+              const mine = m.senderRole === 'doctor';
+              return (
+                <div
+                  key={m.id}
+                  style={{
+                    alignSelf: mine ? 'flex-end' : 'flex-start',
+                    maxWidth: '72%',
+                    background: mine ? 'var(--primary)' : 'var(--surface)',
+                    color: mine ? '#fff' : 'var(--ink)',
+                    border: mine ? 'none' : '1px solid var(--line)',
+                    borderRadius: 12,
+                    padding: '8px 12px',
+                    fontSize: 14,
+                  }}
+                >
+                  {m.text}
+                </div>
+              );
+            })}
+            <div ref={endRef} />
+          </div>
+
+          <div style={{ padding: 12, borderTop: '1px solid var(--line)' }} className="row">
+            <input
+              className="input"
+              style={{ flex: 1 }}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && send()}
+              placeholder={status === 'active' ? 'Type a message…' : 'Chat is open only during the consultation window'}
+              disabled={status !== 'active'}
+            />
+            <button className="btn btn-primary" style={{ marginLeft: 8 }} onClick={send} disabled={status !== 'active' || !draft.trim()}>
+              Send
+            </button>
+          </div>
+          {error && <div style={{ color: 'var(--danger)', fontSize: 12, padding: '0 14px 12px' }}>{error}</div>}
+        </div>
+      )}
     </div>
   );
 }

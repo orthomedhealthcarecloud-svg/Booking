@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { doc, getDoc } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useAuth } from '@/components/AuthProvider';
 import { useDoctor } from '@/components/DoctorProvider';
 import { useBooking } from '@/components/BookingProvider';
 import { Icon } from '@/components/ui/Icon';
 import { Stepper } from '@/components/ui/Stepper';
-import { firestore } from '@/lib/firebase/client';
+import { firestore, storage } from '@/lib/firebase/client';
 
 export default function BookDetailsPage() {
   const doctor = useDoctor();
@@ -17,6 +18,7 @@ export default function BookDetailsPage() {
   const { draft, patch } = useBooking();
   const [form, setForm] = useState(draft.form);
   const [files, setFiles] = useState(draft.files);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (!draft.slot) router.replace(`/${doctor.slug}/book/slot`);
@@ -73,9 +75,52 @@ export default function BookDetailsPage() {
   const canContinue = Boolean((form.complaint ?? '').trim()) && emailValid && phoneValid;
 
   const onContinue = () => {
-    if (!canContinue) return;
+    if (!canContinue || uploading) return;
     patch({ form, files });
     router.push(`/${doctor.slug}/book/pay`);
+  };
+
+  // Upload each selected file to Storage and record it under the patient's documents,
+  // so the doctor can see it later in the patient's history.
+  const onSelectFiles = async (fileList: FileList | null) => {
+    if (!user || !fileList || fileList.length === 0) return;
+    setUploading(true);
+    try {
+      const added: typeof files = [];
+      for (const f of Array.from(fileList)) {
+        const path = `uploads/${user.uid}/${Date.now()}_${f.name.replace(/[^\w.\-]/g, '_')}`;
+        const storageRef = ref(storage(), path);
+        await uploadBytes(storageRef, f, { contentType: f.type });
+        const url = await getDownloadURL(storageRef);
+        const docRef = await addDoc(collection(firestore(), 'documents'), {
+          patientId: user.uid,
+          appointmentId: null,
+          fileType: f.type.startsWith('image/') ? 'image' : 'other',
+          fileName: f.name,
+          fileUrl: url,
+          fileSize: f.size,
+          uploadedAt: serverTimestamp(),
+        });
+        added.push({ name: f.name, size: `${Math.ceil(f.size / 1024)} KB`, url, docId: docRef.id });
+      }
+      setFiles((prev) => [...prev, ...added]);
+    } catch {
+      /* surfaced via the disabled state; keep it simple */
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeFile = async (i: number) => {
+    const f = files[i];
+    setFiles(files.filter((_, j) => j !== i));
+    if (f.docId) {
+      try {
+        await deleteDoc(doc(firestore(), 'documents', f.docId));
+      } catch {
+        /* ignore */
+      }
+    }
   };
 
   return (
@@ -217,15 +262,12 @@ export default function BookDetailsPage() {
               type="file"
               multiple
               style={{ display: 'none' }}
-              onChange={(e) => {
-                const next = Array.from(e.target.files || []).map((f) => ({
-                  name: f.name,
-                  size: `${Math.ceil(f.size / 1024)} KB`,
-                }));
-                setFiles([...files, ...next]);
-              }}
+              onChange={(e) => void onSelectFiles(e.target.files)}
             />
           </label>
+          {uploading && (
+            <div style={{ color: 'var(--ink-3)', fontSize: 12, marginTop: 8 }}>Uploading…</div>
+          )}
           {files.length > 0 && (
             <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
               {files.map((f, i) => (
@@ -246,10 +288,7 @@ export default function BookDetailsPage() {
                       {f.size}
                     </span>
                   </div>
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => setFiles(files.filter((_, j) => j !== i))}
-                  >
+                  <button className="btn btn-ghost btn-sm" onClick={() => void removeFile(i)}>
                     <Icon name="x" size={14} />
                   </button>
                 </div>

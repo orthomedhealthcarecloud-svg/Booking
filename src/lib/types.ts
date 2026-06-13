@@ -104,25 +104,34 @@ export interface DocumentDoc {
   id: string;
   patientId: string;
   appointmentId?: string;
-  fileType: 'mri' | 'xray' | 'ecg' | 'lab' | 'prescription' | 'other';
+  fileType: 'mri' | 'xray' | 'ecg' | 'lab' | 'prescription' | 'image' | 'other';
   fileName: string;
   fileUrl: string;
   fileSize: number;
   uploadedAt: number;
 }
 
+export interface MedicineDoc {
+  id: string;
+  doctorId: string;
+  name: string;
+  strength?: string; // e.g. "500 mg"
+  form?: string; // e.g. "Tablet", "Syrup"
+  defaultDosage?: string; // e.g. "1-0-1 after food"
+  createdAt: number;
+}
+
 export interface PrescriptionDoc {
   id: string;
-  appointmentId: string;
+  appointmentId?: string;
   patientId: string;
+  patientName?: string;
   doctorId: string;
   diagnosis: string;
   medications: Array<{
     name: string;
-    dose: string;
-    frequency: string;
-    duration: string;
-    notes?: string;
+    strength?: string; // e.g. "500 mg"
+    instructions?: string; // free text — "1-0-1 after food for 5 days"
   }>;
   advice: string;
   followUp?: { in: string; mode: ConsultationType | 'in-person' };
