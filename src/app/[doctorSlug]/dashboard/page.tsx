@@ -59,11 +59,35 @@ export default function PatientDashboard() {
 
         <h3 style={{ marginBottom: 12 }}>Upcoming</h3>
         {upcoming.length === 0 ? (
-          <div className="card" style={{ marginBottom: 32, textAlign: 'center' }}>
-            <p style={{ color: 'var(--ink-3)', margin: 0 }}>No upcoming consultations.</p>
-            <Link href={`/${doctor.slug}/book/type`} className="btn btn-primary" style={{ marginTop: 14 }}>
-              Book your first
-            </Link>
+          <div
+            className="card"
+            style={{
+              marginBottom: 32,
+              textAlign: 'center',
+              padding: '40px 24px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 12,
+            }}
+          >
+            <div
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: '50%',
+                background: 'var(--surface-2)',
+                color: 'var(--ink-3)',
+                display: 'grid',
+                placeItems: 'center',
+              }}
+            >
+              <Icon name="calendar" size={20} />
+            </div>
+            <div style={{ fontWeight: 500 }}>No upcoming consultations</div>
+            <div style={{ color: 'var(--ink-3)', fontSize: 13, maxWidth: 320 }}>
+              When you book a consultation, it&apos;ll appear here.
+            </div>
           </div>
         ) : (
           upcoming.map((a) => (
@@ -141,7 +165,34 @@ export default function PatientDashboard() {
         <h3 style={{ marginTop: 28, marginBottom: 12 }}>Past consultations</h3>
         <div className="card" style={{ padding: 0 }}>
           {past.length === 0 ? (
-            <div style={{ padding: 22, color: 'var(--ink-3)' }}>No past consultations yet.</div>
+            <div
+              style={{
+                padding: '40px 24px',
+                textAlign: 'center',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 12,
+              }}
+            >
+              <div
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: '50%',
+                  background: 'var(--surface-2)',
+                  color: 'var(--ink-3)',
+                  display: 'grid',
+                  placeItems: 'center',
+                }}
+              >
+                <Icon name="file" size={20} />
+              </div>
+              <div style={{ fontWeight: 500 }}>No past consultations</div>
+              <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>
+                Your completed consultations will be listed here.
+              </div>
+            </div>
           ) : (
             <table className="tbl">
               <thead>
