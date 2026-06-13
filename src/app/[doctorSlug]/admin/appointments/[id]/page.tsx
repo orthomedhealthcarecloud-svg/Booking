@@ -136,9 +136,14 @@ export default function AdminAppointmentDetail() {
         <button className="btn btn-ghost btn-sm" onClick={() => router.push(`/${doctor.slug}/admin/appointments`)}>
           <Icon name="chevronLeft" size={14} /> Consultations
         </button>
-        <Link href={`/${doctor.slug}/admin/patients/${appt.patientId}`} className="btn btn-ghost btn-sm">
-          Open patient file <Icon name="chevronRight" size={14} />
-        </Link>
+        <div className="row" style={{ gap: 8 }}>
+          <Link href={`/${doctor.slug}/admin/appointments/${appt.id}/prescribe`} className="btn btn-secondary btn-sm">
+            <Icon name="pill" size={14} /> Write prescription
+          </Link>
+          <Link href={`/${doctor.slug}/admin/patients/${appt.patientId}`} className="btn btn-ghost btn-sm">
+            Open patient file <Icon name="chevronRight" size={14} />
+          </Link>
+        </div>
       </div>
 
       {/* Patient + action */}

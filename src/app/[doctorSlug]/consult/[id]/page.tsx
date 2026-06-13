@@ -12,7 +12,7 @@ import { Icon } from '@/components/ui/Icon';
 import { firestore } from '@/lib/firebase/client';
 import { fmtDateLong, fmtTime, fmtMoney } from '@/lib/format';
 import { printPrescription } from '@/lib/prescriptionPrint';
-import type { AppointmentDoc, ChatMessageDoc, PrescriptionDoc } from '@/lib/types';
+import type { AppointmentDoc, ChatMessageDoc, DocumentDoc, PrescriptionDoc } from '@/lib/types';
 
 export default function PatientConsultDetail() {
   const doctor = useDoctor();
@@ -22,6 +22,7 @@ export default function PatientConsultDetail() {
   const [appt, setAppt] = useState<AppointmentDoc | null>(null);
   const [messages, setMessages] = useState<ChatMessageDoc[]>([]);
   const [rxs, setRxs] = useState<PrescriptionDoc[]>([]);
+  const [docs, setDocs] = useState<DocumentDoc[]>([]);
 
   useEffect(() => {
     if (!loading && !user) router.replace(`/${doctor.slug}/login`);
@@ -52,6 +53,13 @@ export default function PatientConsultDetail() {
       // Prescriptions linked to this appointment first; fall back to all of the patient's.
       const forThis = r.filter((p) => p.appointmentId === id);
       setRxs((forThis.length ? forThis : r).sort((a, b) => (b.issuedAt as number) - (a.issuedAt as number)));
+
+      const dSnap = await getDocs(
+        query(collection(firestore(), 'documents'), where('patientId', '==', user.uid)),
+      );
+      const d: DocumentDoc[] = [];
+      dSnap.forEach((x) => d.push({ id: x.id, ...(x.data() as Omit<DocumentDoc, 'id'>) }));
+      setDocs(d.sort((x, y) => (y.uploadedAt as number) - (x.uploadedAt as number)));
     })().catch(() => {});
   }, [id, user]);
 
@@ -138,6 +146,56 @@ export default function PatientConsultDetail() {
                 )}
               </div>
             ))
+          )}
+        </div>
+
+        {/* Reports & images */}
+        <h3 style={{ marginBottom: 12 }}>My reports &amp; images</h3>
+        <div className="card" style={{ padding: 18, marginBottom: 18 }}>
+          {docs.length === 0 ? (
+            <div style={{ color: 'var(--ink-3)' }}>
+              You haven&apos;t uploaded any reports. You can attach them while booking.
+            </div>
+          ) : (
+            <>
+              {docs.filter((d) => d.fileType === 'image').length > 0 && (
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+                    gap: 10,
+                    marginBottom: docs.some((d) => d.fileType !== 'image') ? 16 : 0,
+                  }}
+                >
+                  {docs
+                    .filter((d) => d.fileType === 'image')
+                    .map((img) => (
+                      <a key={img.id} href={img.fileUrl} target="_blank" rel="noreferrer" title={img.fileName}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={img.fileUrl}
+                          alt={img.fileName}
+                          style={{ width: '100%', height: 110, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--line)' }}
+                        />
+                      </a>
+                    ))}
+                </div>
+              )}
+              {docs
+                .filter((d) => d.fileType !== 'image')
+                .map((d) => (
+                  <a
+                    key={d.id}
+                    href={d.fileUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="row"
+                    style={{ gap: 8, padding: '8px 10px', color: 'var(--primary)', textDecoration: 'none' }}
+                  >
+                    <Icon name="file" size={16} /> {d.fileName}
+                  </a>
+                ))}
+            </>
           )}
         </div>
 
