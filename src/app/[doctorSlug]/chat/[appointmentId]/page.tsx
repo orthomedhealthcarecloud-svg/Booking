@@ -34,6 +34,17 @@ function useCountdown(targetMillis: number | null) {
   return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
 }
 
+// Firestore serverTimestamp() reads back as a Timestamp object, not a number —
+// convert safely so message times don't render as "Invalid Date".
+function tsToMillis(v: unknown): number | null {
+  if (!v) return null;
+  if (typeof v === 'number') return v;
+  const o = v as { toMillis?: () => number; seconds?: number };
+  if (typeof o.toMillis === 'function') return o.toMillis();
+  if (typeof o.seconds === 'number') return o.seconds * 1000;
+  return null;
+}
+
 export default function ChatRoomPage() {
   const doctor = useDoctor();
   const router = useRouter();
@@ -79,15 +90,22 @@ export default function ChatRoomPage() {
     return () => unsub();
   }, [appointmentId]);
 
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
   const status: 'before' | 'active' | 'closed' = useMemo(() => {
     if (!appt) return 'before';
-    const now = Date.now();
-    if (now < appt.startTime) return 'before';
-    if (now >= appt.endTime) return 'closed';
+    if (nowTick < appt.startTime) return 'before';
+    if (nowTick >= appt.endTime) return 'closed';
     return 'active';
-  }, [appt]);
+  }, [appt, nowTick]);
 
   const canType = status === 'active';
+  const msLeft = appt && status === 'active' ? appt.endTime - nowTick : 0;
+  const endingSoon = status === 'active' && msLeft > 0 && msLeft <= 5 * 60 * 1000;
 
   const send = async () => {
     if (!canType || !draft.trim() || !user || !appt) return;
@@ -201,7 +219,7 @@ export default function ChatRoomPage() {
                       textAlign: isMe ? 'right' : 'left',
                     }}
                   >
-                    {m.createdAt ? fmtTime(m.createdAt as unknown as number, doctor.timezone) : ''}
+                    {tsToMillis(m.createdAt) ? fmtTime(tsToMillis(m.createdAt)!, doctor.timezone) : ''}
                   </div>
                 </div>
               );
@@ -249,7 +267,30 @@ export default function ChatRoomPage() {
           </div>
         </div>
 
-        <aside style={{ padding: 24, background: 'var(--surface)' }}>
+        <aside
+          style={{
+            padding: 24,
+            background: endingSoon ? '#fdecec' : 'var(--surface)',
+            borderLeft: endingSoon ? '3px solid #e5484d' : '1px solid var(--line)',
+            transition: 'background .3s',
+          }}
+        >
+          {endingSoon && (
+            <div
+              style={{
+                background: '#e5484d',
+                color: '#fff',
+                fontSize: 12,
+                fontWeight: 600,
+                textAlign: 'center',
+                padding: '6px 8px',
+                borderRadius: 8,
+                marginBottom: 14,
+              }}
+            >
+              ⏳ Less than 5 minutes left
+            </div>
+          )}
           <div className="eyebrow" style={{ marginBottom: 10 }}>
             About this visit
           </div>
@@ -263,7 +304,10 @@ export default function ChatRoomPage() {
           <div className="eyebrow" style={{ marginBottom: 10 }}>
             Time remaining
           </div>
-          <div className="mono" style={{ fontSize: 28, fontWeight: 500 }}>
+          <div
+            className="mono"
+            style={{ fontSize: 28, fontWeight: 500, color: endingSoon ? '#e5484d' : 'var(--ink)' }}
+          >
             {status === 'active' ? countdown : '—'}
           </div>
           <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }}>
