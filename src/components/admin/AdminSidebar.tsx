@@ -42,22 +42,6 @@ export function AdminSidebar() {
           : { transition: 'background .3s' }
       }
     >
-      {alert && (
-        <div
-          style={{
-            background: '#e5484d',
-            color: '#fff',
-            fontSize: 12,
-            fontWeight: 600,
-            textAlign: 'center',
-            padding: '6px 8px',
-            borderRadius: 8,
-            marginBottom: 10,
-          }}
-        >
-          ⏳ Less than 5 min left
-        </div>
-      )}
       <Brand />
       <div className="sidebar-section">Practice</div>
       {NAV.map((it) => (

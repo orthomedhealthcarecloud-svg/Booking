@@ -288,7 +288,7 @@ export default function ChatRoomPage() {
                 marginBottom: 14,
               }}
             >
-              ⏳ Less than 5 minutes left
+              Less than 5 minutes left
             </div>
           )}
           <div className="eyebrow" style={{ marginBottom: 10 }}>
