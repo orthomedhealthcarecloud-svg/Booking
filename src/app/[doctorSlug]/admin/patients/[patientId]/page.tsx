@@ -164,18 +164,14 @@ export default function PatientDetail() {
                         </td>
                         <td style={{ color: 'var(--ink-2)', fontSize: 13 }}>{a.chiefComplaint}</td>
                         <td style={{ textAlign: 'right' }}>
-                          {a.type === 'text' ? (
-                            <Link href={`/${doctor.slug}/chat/${a.id}`} className="btn btn-ghost btn-sm">
-                              <Icon name="chat" size={13} /> Chat
-                            </Link>
-                          ) : joinable && a.meetUrl ? (
+                          {a.type === 'video' && joinable && a.meetUrl ? (
                             <a href={a.meetUrl} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm">
                               <Icon name="video" size={13} /> Join
                             </a>
                           ) : (
-                            <span style={{ color: 'var(--ink-4)', fontSize: 12 }}>
-                              {a.status}
-                            </span>
+                            <Link href={`/${doctor.slug}/admin/appointments/${a.id}`} className="btn btn-ghost btn-sm">
+                              Open <Icon name="chevronRight" size={13} />
+                            </Link>
                           )}
                         </td>
                       </tr>

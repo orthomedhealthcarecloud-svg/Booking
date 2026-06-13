@@ -85,7 +85,14 @@ export default function AdminAppointmentDetail() {
   const joinable = Date.now() >= appt.startTime - 5 * 60 * 1000 && Date.now() < appt.endTime;
 
   return (
-    <div data-screen-label="Consultation" style={{ maxWidth: 820 }}>
+    <div
+      data-screen-label="Consultation"
+      style={
+        appt.type === 'text'
+          ? { display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)' }
+          : { maxWidth: 820 }
+      }
+    >
       <div className="row" style={{ justifyContent: 'space-between', marginBottom: 16 }}>
         <button className="btn btn-ghost btn-sm" onClick={() => router.push(`/${doctor.slug}/admin/appointments`)}>
           <Icon name="chevronLeft" size={14} /> Consultations
@@ -126,7 +133,7 @@ export default function AdminAppointmentDetail() {
 
       {/* Web chat for text consults */}
       {appt.type === 'text' && (
-        <div className="card" style={{ padding: 0, display: 'flex', flexDirection: 'column', height: 460 }}>
+        <div className="card" style={{ padding: 0, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
           <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--line)' }} className="row">
             <Icon name="chat" size={15} />
             <span style={{ fontSize: 14, fontWeight: 500, marginLeft: 8 }}>Web chat</span>
