@@ -12,6 +12,48 @@ import { firestore } from '@/lib/firebase/client';
 import { fmtDate, fmtTime } from '@/lib/format';
 import type { AppointmentDoc, DocumentDoc } from '@/lib/types';
 
+function DocGrid({ docs }: { docs: DocumentDoc[] }) {
+  const images = docs.filter((d) => d.fileType === 'image');
+  const others = docs.filter((d) => d.fileType !== 'image');
+  return (
+    <div>
+      {images.length > 0 && (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))',
+            gap: 8,
+            marginBottom: others.length ? 10 : 0,
+          }}
+        >
+          {images.map((img) => (
+            <a key={img.id} href={img.fileUrl} target="_blank" rel="noreferrer" title={img.fileName}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={img.fileUrl}
+                alt={img.fileName}
+                style={{ width: '100%', height: 96, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--line)' }}
+              />
+            </a>
+          ))}
+        </div>
+      )}
+      {others.map((d) => (
+        <a
+          key={d.id}
+          href={d.fileUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="row"
+          style={{ gap: 8, padding: '6px 0', color: 'var(--primary)', textDecoration: 'none', fontSize: 13 }}
+        >
+          <Icon name="file" size={15} /> {d.fileName}
+        </a>
+      ))}
+    </div>
+  );
+}
+
 export default function PatientDetail() {
   const doctor = useDoctor();
   const router = useRouter();
@@ -39,7 +81,7 @@ export default function PatientDetail() {
       );
       const d: DocumentDoc[] = [];
       dSnap.forEach((x) => d.push({ id: x.id, ...(x.data() as Omit<DocumentDoc, 'id'>) }));
-      setDocs(d.sort((x, y) => (y.uploadedAt as number) - (x.uploadedAt as number)));
+      setDocs(d);
     })().catch(() => {});
   }, [patientId, doctor.id]);
 
@@ -54,11 +96,21 @@ export default function PatientDetail() {
     };
   }, [appts, patientId]);
 
-  const images = docs.filter((d) => d.fileType === 'image');
-  const otherDocs = docs.filter((d) => d.fileType !== 'image');
+  const docsByAppt = useMemo(() => {
+    const m = new Map<string, DocumentDoc[]>();
+    for (const d of docs) {
+      if (!d.appointmentId) continue;
+      const arr = m.get(d.appointmentId) || [];
+      arr.push(d);
+      m.set(d.appointmentId, arr);
+    }
+    return m;
+  }, [docs]);
+
+  const unlinked = docs.filter((d) => !d.appointmentId);
 
   return (
-    <div data-screen-label="Patient Detail" style={{ maxWidth: 900 }}>
+    <div data-screen-label="Patient Detail">
       <div className="row" style={{ marginBottom: 16 }}>
         <button className="btn btn-ghost btn-sm" onClick={() => router.push(`/${doctor.slug}/admin/patients`)}>
           <Icon name="chevronLeft" size={14} /> All patients
@@ -84,91 +136,69 @@ export default function PatientDetail() {
         </div>
       </div>
 
-      <h3 style={{ marginBottom: 12 }}>Booking history</h3>
-      <div className="card" style={{ padding: 0, marginBottom: 24 }}>
-        {appts.length === 0 ? (
-          <div style={{ padding: 20, color: 'var(--ink-3)' }}>No bookings.</div>
-        ) : (
-          <table className="tbl">
-            <tbody>
-              {appts.map((a) => {
-                const joinable = Date.now() >= a.startTime - 5 * 60 * 1000 && Date.now() < a.endTime;
-                return (
-                  <tr key={a.id}>
-                    <td>
-                      <div style={{ fontSize: 13 }}>{fmtDate(a.startTime, doctor.timezone)}</div>
+      <h3 style={{ marginBottom: 12 }}>Consultations &amp; reports</h3>
+      {appts.length === 0 ? (
+        <div className="card" style={{ padding: 20, color: 'var(--ink-3)', marginBottom: 22 }}>
+          No bookings.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 22 }}>
+          {appts.map((a) => {
+            const joinable = Date.now() >= a.startTime - 5 * 60 * 1000 && Date.now() < a.endTime;
+            const sessionDocs = docsByAppt.get(a.id) || [];
+            return (
+              <div key={a.id} className="card" style={{ padding: 18 }}>
+                <div className="row" style={{ justifyContent: 'space-between', gap: 14 }}>
+                  <div className="row" style={{ gap: 14 }}>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 500 }}>
+                        {fmtDate(a.startTime, doctor.timezone)}
+                      </div>
                       <div className="mono" style={{ fontSize: 12, color: 'var(--ink-3)' }}>
                         {fmtTime(a.startTime, doctor.timezone)}
                       </div>
-                    </td>
-                    <td>
-                      <Chip>
-                        <Icon name={a.type === 'video' ? 'video' : 'chat'} size={12} />{' '}
-                        {a.type === 'video' ? 'Video' : 'Text'}
-                      </Chip>
-                    </td>
-                    <td style={{ color: 'var(--ink-2)', fontSize: 13 }}>{a.chiefComplaint}</td>
-                    <td style={{ textAlign: 'right' }}>
-                      {a.type === 'video' && joinable && a.meetUrl ? (
-                        <a href={a.meetUrl} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm">
-                          <Icon name="video" size={13} /> Join
-                        </a>
-                      ) : (
-                        <Link href={`/${doctor.slug}/admin/appointments/${a.id}`} className="btn btn-ghost btn-sm">
-                          Open <Icon name="chevronRight" size={13} />
-                        </Link>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      <h3 style={{ marginBottom: 12 }}>Uploaded reports &amp; images</h3>
-      <div className="card" style={{ padding: 18 }}>
-        {docs.length === 0 ? (
-          <div style={{ color: 'var(--ink-3)' }}>Nothing uploaded by this patient.</div>
-        ) : (
-          <>
-            {images.length > 0 && (
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-                  gap: 10,
-                  marginBottom: otherDocs.length ? 16 : 0,
-                }}
-              >
-                {images.map((img) => (
-                  <a key={img.id} href={img.fileUrl} target="_blank" rel="noreferrer" title={img.fileName}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={img.fileUrl}
-                      alt={img.fileName}
-                      style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--line)' }}
-                    />
-                  </a>
-                ))}
+                    </div>
+                    <Chip>
+                      <Icon name={a.type === 'video' ? 'video' : 'chat'} size={12} />{' '}
+                      {a.type === 'video' ? 'Video' : 'Text'}
+                    </Chip>
+                    <span style={{ color: 'var(--ink-2)', fontSize: 14 }}>{a.chiefComplaint}</span>
+                  </div>
+                  {a.type === 'video' && joinable && a.meetUrl ? (
+                    <a href={a.meetUrl} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm">
+                      <Icon name="video" size={13} /> Join
+                    </a>
+                  ) : (
+                    <Link href={`/${doctor.slug}/admin/appointments/${a.id}`} className="btn btn-ghost btn-sm">
+                      Open <Icon name="chevronRight" size={13} />
+                    </Link>
+                  )}
+                </div>
+                {sessionDocs.length > 0 && (
+                  <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--line)' }}>
+                    <div className="eyebrow" style={{ marginBottom: 10 }}>
+                      Reports for this session
+                    </div>
+                    <DocGrid docs={sessionDocs} />
+                  </div>
+                )}
               </div>
-            )}
-            {otherDocs.map((d) => (
-              <a
-                key={d.id}
-                href={d.fileUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="row"
-                style={{ gap: 8, padding: '8px 10px', color: 'var(--primary)', textDecoration: 'none' }}
-              >
-                <Icon name="file" size={16} /> {d.fileName}
-              </a>
-            ))}
-          </>
-        )}
-      </div>
+            );
+          })}
+        </div>
+      )}
+
+      {unlinked.length > 0 && (
+        <>
+          <h3 style={{ marginBottom: 12 }}>Other uploads</h3>
+          <div className="card" style={{ padding: 18, marginBottom: 22 }}>
+            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 10 }}>
+              Files not tied to a specific session.
+            </div>
+            <DocGrid docs={unlinked} />
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -59,7 +59,8 @@ export default function PatientConsultDetail() {
       );
       const d: DocumentDoc[] = [];
       dSnap.forEach((x) => d.push({ id: x.id, ...(x.data() as Omit<DocumentDoc, 'id'>) }));
-      setDocs(d.sort((x, y) => (y.uploadedAt as number) - (x.uploadedAt as number)));
+      // Only this session's reports (not a common pool).
+      setDocs(d.filter((x) => x.appointmentId === id));
     })().catch(() => {});
   }, [id, user]);
 

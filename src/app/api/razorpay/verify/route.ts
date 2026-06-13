@@ -20,6 +20,7 @@ type Body = {
   notesForDoctor?: string;
   amountPaid: number;
   form: { name: string; email: string; phone: string; age: string; gender: string };
+  documentIds?: string[];
 };
 
 function verifySignature(orderId: string, paymentId: string, signature: string): boolean {
@@ -161,6 +162,20 @@ export async function POST(req: Request) {
         createdAt: FieldValue.serverTimestamp(),
       });
     });
+
+    // Link any documents uploaded during this booking to the new appointment,
+    // so the doctor sees them under this specific session (not a common pool).
+    if (body.documentIds?.length) {
+      const linkBatch = db.batch();
+      for (const docId of body.documentIds.slice(0, 20)) {
+        linkBatch.set(
+          db.collection('documents').doc(docId),
+          { appointmentId: apptRef.id },
+          { merge: true },
+        );
+      }
+      await linkBatch.commit().catch(() => {});
+    }
 
     // Best-effort: create a Google Calendar event on the doctor's calendar.
     // Done after the transaction so a slow network call doesn't hold the txn open.

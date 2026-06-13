@@ -86,6 +86,7 @@ export default function BookPayPage() {
                 notesForDoctor: draft.form.notes,
                 amountPaid: total,
                 form: draft.form,
+                documentIds: draft.files.map((f) => f.docId).filter(Boolean),
               }),
             });
             if (!finalize.ok) throw new Error((await finalize.json()).error || 'Verification failed');
