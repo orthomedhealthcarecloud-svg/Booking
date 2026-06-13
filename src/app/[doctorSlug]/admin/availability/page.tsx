@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   collection,
   doc,
@@ -129,8 +129,9 @@ export default function AvailabilityPage() {
   const columns = useMemo(buildColumns, []);
   const [grid, setGrid] = useState<CellState[][]>(() => SLOTS.map(() => columns.map(() => 'off')));
   const [saving, setSaving] = useState(false);
-  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
-  const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [statusMsg, setStatusMsg] = useState<string>('');
+  const gridRef = useRef(grid);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const materialize = useCallback(async (): Promise<string> => {
     if (!user) return 'Saved.';
@@ -140,10 +141,42 @@ export default function AvailabilityPage() {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ doctorId: doctor.id }),
     });
-    if (!res.ok) return 'Saved, but publishing slots failed. Try again.';
+    if (!res.ok) return 'Saved, but publishing slots failed.';
     const r = (await res.json()) as { total: number };
-    return `Published ${r.total} bookable slots for the next 30 days.`;
+    return `Saved · ${r.total} bookable slots published for the next 7 days.`;
   }, [user, doctor.id]);
+
+  const save = useCallback(async () => {
+    setSaving(true);
+    setStatusMsg('Saving…');
+    try {
+      await Promise.all(
+        columns.map(async (col, ci) => {
+          const blocks = buildBlocks(SLOTS.map((_, ri) => gridRef.current[ri][ci]));
+          await setDoc(doc(firestore(), 'availability_templates', `${doctor.id}_${col.dayOfWeek}`), {
+            doctorId: doctor.id,
+            dayOfWeek: col.dayOfWeek,
+            blocks,
+            slotDurationMinutes: 30,
+            isActive: true,
+            updatedAt: serverTimestamp(),
+          });
+        }),
+      );
+      setStatusMsg(await materialize());
+    } catch {
+      setStatusMsg('Save failed — check your connection.');
+    } finally {
+      setSaving(false);
+    }
+  }, [columns, doctor.id, materialize]);
+
+  // Debounced auto-save — fires ~800ms after the last edit.
+  const scheduleSave = useCallback(() => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    setStatusMsg('Saving…');
+    saveTimer.current = setTimeout(() => void save(), 800);
+  }, [save]);
 
   useEffect(() => {
     const load = async () => {
@@ -161,37 +194,19 @@ export default function AvailabilityPage() {
         if (ci === -1) return;
         blocksToCells(t.blocks).forEach((c, ri) => (next[ri][ci] = c));
       });
+      gridRef.current = next;
       setGrid(next);
     };
     load().catch(() => {});
   }, [doctor.id, columns]);
 
-  const save = async () => {
-    setSaving(true);
-    setStatusMsg(null);
-    try {
-      await Promise.all(
-        columns.map(async (col, ci) => {
-          const blocks = buildBlocks(SLOTS.map((_, ri) => grid[ri][ci]));
-          await setDoc(doc(firestore(), 'availability_templates', `${doctor.id}_${col.dayOfWeek}`), {
-            doctorId: doctor.id,
-            dayOfWeek: col.dayOfWeek,
-            blocks,
-            slotDurationMinutes: 30,
-            isActive: true,
-            updatedAt: serverTimestamp(),
-          });
-        }),
-      );
-      setStatusMsg(await materialize());
-      setLastSavedAt(Date.now());
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const click = (r: number, c: number) => {
-    setGrid((g) => g.map((row, ri) => row.map((cell, ci) => (ri === r && ci === c ? cycle(cell) : cell))));
+    setGrid((g) => {
+      const next = g.map((row, ri) => row.map((cell, ci) => (ri === r && ci === c ? cycle(cell) : cell)));
+      gridRef.current = next;
+      return next;
+    });
+    scheduleSave();
   };
 
   return (
@@ -200,23 +215,28 @@ export default function AvailabilityPage() {
         <div>
           <h1>Availability</h1>
           <div className="sub">
-            Rolling week starting today. Edits repeat every week — next Monday keeps last Monday&apos;s
-            schedule unless you change it.
+            Rolling week starting today. Changes save automatically and repeat every week — next
+            Monday keeps last Monday&apos;s schedule unless you change it.
           </div>
         </div>
         <div className="row" style={{ gap: 8 }}>
-          {statusMsg ? (
-            <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{statusMsg}</span>
-          ) : (
-            lastSavedAt && (
-              <span className="mono" style={{ fontSize: 12, color: 'var(--ink-3)' }}>
-                saved {new Date(lastSavedAt).toLocaleTimeString('en-IN')}
-              </span>
-            )
-          )}
-          <button className="btn btn-primary" onClick={save} disabled={saving}>
-            {saving ? 'Saving…' : 'Save template'}
-          </button>
+          <span
+            className="row"
+            style={{ gap: 6, fontSize: 12, color: saving ? 'var(--ink-2)' : 'var(--ink-3)' }}
+          >
+            {saving && (
+              <span
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: '50%',
+                  background: 'var(--warn, #d98a00)',
+                  display: 'inline-block',
+                }}
+              />
+            )}
+            {statusMsg || 'All changes saved automatically.'}
+          </span>
         </div>
       </div>
 

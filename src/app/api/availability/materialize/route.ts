@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
+import { getDoctor } from '@/lib/doctors';
 import { slotIdFor } from '@/lib/format';
 
 export const runtime = 'nodejs';
 
-const DAYS_AHEAD = 30;
+const DAYS_AHEAD = 7;
 const DEFAULT_SLOT_MIN = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -13,6 +14,20 @@ type Block = { startMinute: number; endMinute: number; allowedTypes: Consultatio
 type Template = { dayOfWeek: number; blocks: Block[]; slotDurationMinutes?: number };
 
 const pad = (n: number) => String(n).padStart(2, '0');
+
+// Offset (minutes) such that localTime = utc + offset, for an IANA tz at a given instant.
+function tzOffsetMin(tz: string, utcMs: number): number {
+  const d = new Date(utcMs);
+  const local = new Date(d.toLocaleString('en-US', { timeZone: tz }));
+  const utc = new Date(d.toLocaleString('en-US', { timeZone: 'UTC' }));
+  return Math.round((local.getTime() - utc.getTime()) / 60000);
+}
+
+// UTC millis for a wall-clock time (y, mo[1-12], d, minutesFromMidnight) in `tz`.
+function wallToUTC(y: number, mo: number, d: number, minutes: number, tz: string): number {
+  const guess = Date.UTC(y, mo - 1, d, Math.floor(minutes / 60), minutes % 60, 0);
+  return guess - tzOffsetMin(tz, guess) * 60000;
+}
 
 /**
  * Regenerates `availability_instances` for the next 30 days from a doctor's active
@@ -59,9 +74,20 @@ export async function POST(req: Request) {
       overrideByDate.set(o.date, o);
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const rangeStart = today.getTime();
+    // All times are interpreted in the doctor's timezone (not the server's, which is
+    // UTC on Vercel — otherwise "13:30" would be created as 13:30 UTC = 19:00 IST).
+    const tz = getDoctor(doctorId)?.timezone || 'Asia/Kolkata';
+
+    // "Today" as a calendar date in the doctor's timezone.
+    const todayStr = new Intl.DateTimeFormat('en-CA', {
+      timeZone: tz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+    const [ty, tm, td] = todayStr.split('-').map(Number);
+
+    const rangeStart = wallToUTC(ty, tm, td, 0, tz);
     const rangeEnd = rangeStart + DAYS_AHEAD * DAY_MS;
 
     // Build the desired set of slots from the templates.
@@ -70,13 +96,18 @@ export async function POST(req: Request) {
       { startMillis: number; endMillis: number; date: string; allowedTypes: ConsultationType[] }
     >();
     for (let i = 0; i < DAYS_AHEAD; i++) {
-      const day = new Date(today);
-      day.setDate(day.getDate() + i);
-      const dateStr = `${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}`;
+      // Increment the calendar date safely (purely as a date, tz-agnostic).
+      const cal = new Date(Date.UTC(ty, tm - 1, td));
+      cal.setUTCDate(cal.getUTCDate() + i);
+      const Y = cal.getUTCFullYear();
+      const Mo = cal.getUTCMonth() + 1;
+      const D = cal.getUTCDate();
+      const dow = cal.getUTCDay();
+      const dateStr = `${Y}-${pad(Mo)}-${pad(D)}`;
 
       // A date override wins over the weekly default for that exact date.
       const override = overrideByDate.get(dateStr);
-      const template = templateByDow.get(day.getDay());
+      const template = templateByDow.get(dow);
       const source = override ?? template;
       if (!source) continue;
       if (override && override.isActive === false) continue; // explicitly closed that day
@@ -85,17 +116,10 @@ export async function POST(req: Request) {
 
       for (const b of blocks) {
         for (let m = b.startMinute; m + dur <= b.endMinute; m += dur) {
-          const start = new Date(day);
-          start.setHours(Math.floor(m / 60), m % 60, 0, 0);
-          const end = new Date(start);
-          end.setMinutes(end.getMinutes() + dur);
-          const id = slotIdFor(doctorId, start.getTime());
-          desired.set(id, {
-            startMillis: start.getTime(),
-            endMillis: end.getTime(),
-            date: dateStr,
-            allowedTypes: b.allowedTypes,
-          });
+          const startMillis = wallToUTC(Y, Mo, D, m, tz);
+          const endMillis = startMillis + dur * 60000;
+          const id = slotIdFor(doctorId, startMillis);
+          desired.set(id, { startMillis, endMillis, date: dateStr, allowedTypes: b.allowedTypes });
         }
       }
     }
