@@ -25,16 +25,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       router.replace(`/${doctor.slug}/admin/login`);
       return;
     }
+    const ok = (tok: { claims: Record<string, unknown> }) =>
+      tok.claims.doctorId === doctor.id || tok.claims.admin === true;
+    // Fast path: cached claims (valid ~1h, no network). Fallback: force-refresh once
+    // in case claims were just granted (e.g. right after seeding).
     user
-      .getIdTokenResult(true)
-      .then((tok) => {
-        const claimDoctorId = tok.claims.doctorId as string | undefined;
-        if (claimDoctorId === doctor.id || tok.claims.admin === true) {
-          setAllowed(true);
-        } else {
-          setAllowed(false);
-        }
-      })
+      .getIdTokenResult()
+      .then((tok) => (ok(tok) ? true : user.getIdTokenResult(true).then(ok)))
+      .then((allow) => setAllowed(allow))
       .catch(() => setAllowed(false));
   }, [loading, user, doctor.id, doctor.slug, onLogin, router]);
 
