@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { doc, getDoc } from 'firebase/firestore';
 import { useAuth } from '@/components/AuthProvider';
 import { useDoctor } from '@/components/DoctorProvider';
 import { useBooking } from '@/components/BookingProvider';
 import { Icon } from '@/components/ui/Icon';
 import { Stepper } from '@/components/ui/Stepper';
+import { firestore } from '@/lib/firebase/client';
 
 export default function BookDetailsPage() {
   const doctor = useDoctor();
@@ -32,6 +34,36 @@ export default function BookDetailsPage() {
       setForm((f) => ({ ...f, phone: user.phoneNumber! }));
     }
   }, [user, form.phone]);
+
+  // Prefill from the patient's saved profile (from a previous booking) so they don't
+  // re-enter their details every time. Only fills fields that are still empty.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    getDoc(doc(firestore(), 'users', user.uid))
+      .then((snap) => {
+        if (cancelled || !snap.exists()) return;
+        const p = snap.data() as {
+          name?: string;
+          email?: string;
+          phone?: string;
+          age?: number;
+          gender?: 'Female' | 'Male' | 'Other';
+        };
+        setForm((f) => ({
+          ...f,
+          name: f.name || p.name || '',
+          email: f.email || p.email || '',
+          phone: f.phone || p.phone || '',
+          age: f.age || (p.age ? String(p.age) : ''),
+          gender: f.gender || p.gender || 'Female',
+        }));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   // If the patient logged in with a phone number, it's their verified number — lock the field.
   const lockedPhone = Boolean(user?.phoneNumber);
