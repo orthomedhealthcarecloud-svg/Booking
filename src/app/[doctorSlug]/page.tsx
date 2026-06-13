@@ -2,141 +2,76 @@
 
 import Link from 'next/link';
 import { useDoctor } from '@/components/DoctorProvider';
-import { Avatar } from '@/components/ui/Avatar';
-import { Chip } from '@/components/ui/Chip';
-import { Icon } from '@/components/ui/Icon';
-import { fmtMoney } from '@/lib/format';
 
 export default function PatientLanding() {
   const doctor = useDoctor();
   const loginHref = `/${doctor.slug}/login`;
+  const shortName = doctor.name.split(' ').slice(0, 2).join(' ');
 
   return (
-    <div className="patient-wrap" data-screen-label="Patient Landing">
+    <div
+      data-screen-label="Patient Landing"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        minHeight: 'calc(100vh - 4px)',
+      }}
+    >
+      {/* Left — doctor photo */}
+      <div style={{ position: 'relative', background: 'var(--surface-2)', overflow: 'hidden' }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/home.jpg"
+          alt={doctor.name}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
+      </div>
+
+      {/* Right — introduction */}
       <div
         style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 380px',
-          gap: 64,
-          alignItems: 'center',
-          minHeight: 'calc(100vh - 200px)',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          padding: '64px clamp(40px, 6vw, 88px)',
         }}
       >
-        <div>
-          <div className="eyebrow" style={{ marginBottom: 18 }}>
-            Online consultation
-          </div>
-          <h1
-            style={{
-              fontSize: 48,
-              lineHeight: 1.1,
-              letterSpacing: '-0.025em',
-              marginBottom: 22,
-              maxWidth: 560,
-            }}
-          >
-            {doctor.specialty.includes('Ortho')
-              ? 'Bone and joint care, without leaving home.'
-              : 'Expert care, without leaving home.'}
-          </h1>
-          <p
-            style={{
-              fontSize: 17,
-              color: 'var(--ink-2)',
-              maxWidth: 480,
-              marginBottom: 32,
-              lineHeight: 1.55,
-            }}
-          >
-            Consult {doctor.name.split(' ').slice(0, 2).join(' ')} for advice, follow-ups, and digital
-            prescriptions. Share reports, get a treatment plan, and review your records — all online.
-          </p>
-          <div className="row" style={{ gap: 10 }}>
-            <Link href={loginHref} className="btn btn-primary btn-lg">
-              Book consultation
-            </Link>
-            <Link href={loginHref} className="btn btn-ghost btn-lg">
-              I have an appointment →
-            </Link>
-          </div>
-
-          <div
-            style={{
-              display: 'flex',
-              gap: 32,
-              marginTop: 56,
-              color: 'var(--ink-2)',
-              fontSize: 13,
-            }}
-          >
-            <div className="row" style={{ gap: 8 }}>
-              <Icon name="shield" size={16} /> Encrypted records
-            </div>
-            <div className="row" style={{ gap: 8 }}>
-              <Icon name="lock" size={16} /> OTP login, no password
-            </div>
-            <div className="row" style={{ gap: 8 }}>
-              <Icon name="inr" size={16} /> Pay only after booking
-            </div>
-          </div>
+        <div className="eyebrow" style={{ marginBottom: 18 }}>
+          Online consultation
+        </div>
+        <h1 style={{ fontSize: 'clamp(48px, 6vw, 72px)', lineHeight: 1, fontWeight: 700, marginBottom: 6 }}>
+          Hello,
+        </h1>
+        <div style={{ fontSize: 'clamp(26px, 3vw, 36px)', fontWeight: 500, marginBottom: 16 }}>
+          I&apos;m {doctor.name}
+        </div>
+        <div style={{ fontSize: 16, color: 'var(--ink-2)', marginBottom: 24 }}>
+          {doctor.qualifications}
         </div>
 
-        <div className="card" style={{ padding: 28 }}>
-          <div className="row" style={{ gap: 14, marginBottom: 18 }}>
-            <Avatar name={doctor.name} size="lg" />
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 17 }}>{doctor.name}</div>
-              <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>{doctor.qualifications}</div>
-            </div>
-          </div>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: 14,
-              fontSize: 13,
-              padding: '14px 0',
-              borderTop: '1px solid var(--line)',
-              borderBottom: '1px solid var(--line)',
-            }}
-          >
-            <div>
-              <div style={{ color: 'var(--ink-3)', marginBottom: 2 }}>Experience</div>
-              <div>{doctor.experienceYears} years</div>
-            </div>
-            <div>
-              <div style={{ color: 'var(--ink-3)', marginBottom: 2 }}>Languages</div>
-              <div>{doctor.languages}</div>
-            </div>
-            <div>
-              <div style={{ color: 'var(--ink-3)', marginBottom: 2 }}>Reg. no.</div>
-              <div className="mono" style={{ fontSize: 12 }}>
-                {doctor.registration || '—'}
-              </div>
-            </div>
-            <div>
-              <div style={{ color: 'var(--ink-3)', marginBottom: 2 }}>Mode</div>
-              <div>{doctor.hasVideo ? 'Video, Text' : 'Text'}</div>
-            </div>
-          </div>
-          <div
-            style={{
-              marginTop: 16,
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'baseline',
-            }}
-          >
-            <div>
-              <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>Consultation from</div>
-              <div className="mono" style={{ fontSize: 22, fontWeight: 500, marginTop: 2 }}>
-                {fmtMoney(doctor.fee.text)}
-              </div>
-            </div>
-            <Chip variant="ok" dot>
-              Available today
-            </Chip>
-          </div>
+        <p
+          style={{
+            borderLeft: '3px solid var(--ink)',
+            paddingLeft: 20,
+            fontSize: 16,
+            color: 'var(--ink-2)',
+            lineHeight: 1.65,
+            marginBottom: 34,
+            maxWidth: 520,
+          }}
+        >
+          Consult {shortName} for advice, follow-ups, and digital prescriptions. Share your reports,
+          get a personalised treatment plan, and review your records — all online, without leaving
+          home.
+        </p>
+
+        <div className="row" style={{ gap: 12 }}>
+          <Link href={loginHref} className="btn btn-primary btn-lg">
+            Book consultation →
+          </Link>
+          <Link href={loginHref} className="btn btn-ghost btn-lg">
+            I have an appointment
+          </Link>
         </div>
       </div>
     </div>
