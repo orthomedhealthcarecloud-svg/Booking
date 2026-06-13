@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import { useDoctor } from '@/components/DoctorProvider';
-import { useConsultAlert } from '@/components/admin/ConsultAlert';
 import { Avatar } from '@/components/ui/Avatar';
 import { Brand } from '@/components/ui/Brand';
 import { Icon, type IconName } from '@/components/ui/Icon';
@@ -27,21 +26,13 @@ export function AdminSidebar() {
   const doctor = useDoctor();
   const pathname = usePathname();
   const { user } = useAuth();
-  const { alert } = useConsultAlert();
   const base = `/${doctor.slug}/admin`;
   const isActive = (href: string) => {
     const full = `${base}${href}`;
     return href === '' ? pathname === full : pathname.startsWith(full);
   };
   return (
-    <aside
-      className="sidebar"
-      style={
-        alert
-          ? { background: '#fdecec', borderRight: '2px solid #e5484d', transition: 'background .3s' }
-          : { transition: 'background .3s' }
-      }
-    >
+    <aside className="sidebar">
       <Brand />
       <div className="sidebar-section">Practice</div>
       {NAV.map((it) => (
