@@ -34,7 +34,7 @@ export function PatientTopbar() {
         <Link href={link('/dashboard')} className={isActive('/dashboard') ? 'active' : ''}>
           My consultations
         </Link>
-        <Link href={link('/book/type')} className={isActive('/book') ? 'active' : ''}>
+        <Link href={link('/book/slot')} className={isActive('/book') ? 'active' : ''}>
           Book new
         </Link>
         <Link href={link('/help')} className={isActive('/help') ? 'active' : ''}>

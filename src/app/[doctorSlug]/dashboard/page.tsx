@@ -9,7 +9,7 @@ import { PatientTopbar } from '@/components/patient/PatientTopbar';
 import { Chip } from '@/components/ui/Chip';
 import { Icon } from '@/components/ui/Icon';
 import { subscribePatientAppointments } from '@/lib/firestore/appointments';
-import { fmtDate, fmtDateLong, fmtMoney, fmtTime } from '@/lib/format';
+import { fmtDate, fmtDateLong, fmtTime } from '@/lib/format';
 import type { AppointmentDoc } from '@/lib/types';
 
 export default function PatientDashboard() {
@@ -52,7 +52,7 @@ export default function PatientDashboard() {
             </div>
             <h1>{user?.displayName || 'Patient'}</h1>
           </div>
-          <Link href={`/${doctor.slug}/book/type`} className="btn btn-primary">
+          <Link href={`/${doctor.slug}/book/slot`} className="btn btn-primary">
             <Icon name="plus" size={16} /> New consultation
           </Link>
         </div>
@@ -110,52 +110,20 @@ export default function PatientDashboard() {
                     ) : (
                       <Chip>{fmtDate(a.startTime, doctor.timezone)}</Chip>
                     )}
-                    <Chip>
-                      <Icon name={a.type === 'video' ? 'video' : 'chat'} size={12} />{' '}
-                      {a.type === 'video' ? 'Video' : 'Text'}
-                    </Chip>
+                    <Chip>Walk-in</Chip>
                   </div>
                   <div style={{ fontSize: 19, fontWeight: 600, marginBottom: 4 }}>{doctor.name}</div>
                   <div style={{ color: 'var(--ink-2)', fontSize: 14 }}>
                     <span className="mono">
                       {fmtDate(a.startTime, doctor.timezone)}, {fmtTime(a.startTime, doctor.timezone)}
                     </span>{' '}
-                    · 30 minutes · {a.chiefComplaint}
+                    · {a.chiefComplaint}
                   </div>
                 </div>
                 <div className="row" style={{ gap: 8 }}>
-                  {(() => {
-                    // Joinable from 5 min before start until the appointment ends.
-                    const LEAD_MS = 5 * 60 * 1000;
-                    const joinable = now >= a.startTime - LEAD_MS && now < a.endTime;
-                    if (!joinable) {
-                      return (
-                        <button className="btn btn-secondary" disabled>
-                          {now >= a.endTime ? 'Ended' : `Opens ${fmtTime(a.startTime, doctor.timezone)}`}
-                        </button>
-                      );
-                    }
-                    if (a.type === 'video') {
-                      return a.meetUrl ? (
-                        <a href={a.meetUrl} target="_blank" rel="noreferrer" className="btn btn-primary">
-                          Join Google Meet
-                        </a>
-                      ) : (
-                        <button
-                          className="btn btn-secondary"
-                          disabled
-                          title="Meet link not generated — the doctor's Google Calendar needs reconnecting with calendar access"
-                        >
-                          Meet link unavailable
-                        </button>
-                      );
-                    }
-                    return (
-                      <Link href={`/${doctor.slug}/chat/${a.id}`} className="btn btn-primary">
-                        Join consultation
-                      </Link>
-                    );
-                  })()}
+                  <Link href={`/${doctor.slug}/consult/${a.id}`} className="btn btn-secondary">
+                    View
+                  </Link>
                 </div>
               </div>
             </div>
@@ -198,9 +166,7 @@ export default function PatientDashboard() {
               <thead>
                 <tr>
                   <th>Date</th>
-                  <th>Mode</th>
-                  <th>Complaint</th>
-                  <th>Amount</th>
+                  <th>Reason</th>
                   <th />
                 </tr>
               </thead>
@@ -210,14 +176,7 @@ export default function PatientDashboard() {
                     <td className="mono" style={{ fontSize: 13 }}>
                       {fmtDateLong(a.startTime, doctor.timezone)}
                     </td>
-                    <td>
-                      <Chip>
-                        <Icon name={a.type === 'video' ? 'video' : 'chat'} size={12} />{' '}
-                        {a.type === 'video' ? 'Video' : 'Text'}
-                      </Chip>
-                    </td>
                     <td>{a.chiefComplaint}</td>
-                    <td className="mono">{a.amountPaid ? fmtMoney(a.amountPaid) : '—'}</td>
                     <td style={{ textAlign: 'right' }}>
                       <Link href={`/${doctor.slug}/consult/${a.id}`} className="btn btn-ghost btn-sm">
                         View →

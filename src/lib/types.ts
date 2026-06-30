@@ -17,7 +17,8 @@ export interface UserDoc {
   role: UserRole;
 }
 
-export type ConsultationType = 'video' | 'text';
+// Walk-in (in-clinic) appointments only.
+export type ConsultationType = 'walkin';
 
 export type AppointmentStatus =
   | 'pending'

@@ -88,8 +88,7 @@ export default function DoctorDashboard() {
                   <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>
                     {live.patientAge ? `${live.patientAge} y · ` : ''}
                     {live.patientGender || ''} ·{' '}
-                    <span className="mono">{fmtTime(live.startTime, doctor.timezone)}</span> ·{' '}
-                    {live.type === 'video' ? 'Video' : 'Text'}
+                    <span className="mono">{fmtTime(live.startTime, doctor.timezone)}</span> · Walk-in
                   </div>
                   <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 6 }}>
                     {live.chiefComplaint}
@@ -112,8 +111,7 @@ export default function DoctorDashboard() {
                   <tr>
                     <th style={{ width: 90 }}>Time</th>
                     <th>Patient</th>
-                    <th>Mode</th>
-                    <th>Complaint</th>
+                    <th>Reason</th>
                     <th />
                   </tr>
                 </thead>
@@ -137,12 +135,6 @@ export default function DoctorDashboard() {
                             </div>
                           </div>
                         </div>
-                      </td>
-                      <td>
-                        <Chip>
-                          <Icon name={a.type === 'video' ? 'video' : 'chat'} size={12} />{' '}
-                          {a.type === 'video' ? 'Video' : 'Text'}
-                        </Chip>
                       </td>
                       <td style={{ color: 'var(--ink-2)' }}>{a.chiefComplaint}</td>
                       <td style={{ textAlign: 'right', color: 'var(--ink-3)' }}>
@@ -168,12 +160,6 @@ export default function DoctorDashboard() {
                         {fmtTime(a.startTime, doctor.timezone)}
                       </td>
                       <td style={{ color: 'var(--ink-2)' }}>{a.chiefComplaint}</td>
-                      <td>
-                        <Chip>
-                          <Icon name={a.type === 'video' ? 'video' : 'chat'} size={12} />{' '}
-                          {a.type === 'video' ? 'Video' : 'Text'}
-                        </Chip>
-                      </td>
                       <td style={{ textAlign: 'right' }}>
                         <Chip variant={a.status === 'completed' ? 'ok' : 'default'} dot>
                           {a.status}
@@ -218,8 +204,7 @@ export default function DoctorDashboard() {
             </div>
             {[
               ['Firebase', 'live'],
-              ['Razorpay', process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ? 'live' : 'not configured'],
-              ['Google Meet', doctor.hasVideo ? 'configured' : 'not configured'],
+              ['Walk-in booking', 'live'],
             ].map(([k, v]) => (
               <div
                 key={k}

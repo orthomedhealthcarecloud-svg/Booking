@@ -38,10 +38,16 @@
   --mono: var(--font-geist-mono), ui-monospace, 'SF Mono', Menlo, monospace;
 
   /* Radii */
-  --r-sm: 6px;
-  --r: 10px;
-  --r-lg: 14px;
-  --r-xl: 20px;
+  --r-sm: 7px;
+  --r: 11px;
+  --r-lg: 16px;
+  --r-xl: 22px;
+
+  /* Elevation — soft, layered, low-contrast (premium depth) */
+  --shadow-xs: 0 1px 2px oklch(0.45 0.03 240 / 0.05);
+  --shadow-sm: 0 1px 2px oklch(0.45 0.03 240 / 0.05), 0 2px 6px oklch(0.45 0.03 240 / 0.04);
+  --shadow: 0 1px 3px oklch(0.45 0.03 240 / 0.06), 0 8px 24px oklch(0.45 0.03 240 / 0.06);
+  --shadow-lg: 0 4px 12px oklch(0.4 0.03 240 / 0.08), 0 24px 48px oklch(0.4 0.03 240 / 0.10);
 }
 
 * { box-sizing: border-box; }
@@ -77,9 +83,11 @@ a { color: inherit; text-decoration: none; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 40px;
+  padding: 16px 40px;
   border-bottom: 1px solid var(--line);
-  background: var(--bg);
+  background: oklch(0.985 0.006 235 / 0.8);
+  backdrop-filter: saturate(1.4) blur(12px);
+  -webkit-backdrop-filter: saturate(1.4) blur(12px);
   position: sticky;
   top: 0;
   z-index: 10;
@@ -228,8 +236,10 @@ h3 { font-size: 17px; }
 .btn-primary {
   background: var(--primary);
   color: white;
+  box-shadow: 0 1px 2px oklch(0.45 0.13 235 / 0.25), inset 0 1px 0 oklch(1 0 0 / 0.12);
 }
 .btn-primary:hover { background: var(--primary-hover); }
+.btn:active:not(:disabled) { transform: translateY(0.5px); }
 .btn-primary:disabled {
   background: var(--line-strong);
   color: var(--ink-3);
@@ -253,6 +263,7 @@ h3 { font-size: 17px; }
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   padding: 22px;
+  box-shadow: var(--shadow-sm);
 }
 .card-flat {
   background: var(--surface);
@@ -271,13 +282,14 @@ h3 { font-size: 17px; }
 .input, .select, .textarea {
   height: 44px;
   background: var(--surface);
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--line);
   border-radius: var(--r);
   padding: 0 14px;
   font-size: 15px;
   color: var(--ink);
   width: 100%;
   outline: none;
+  box-shadow: var(--shadow-xs);
   transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
 .textarea { height: auto; padding: 12px 14px; min-height: 100px; line-height: 1.5; resize: vertical; }
@@ -369,20 +381,60 @@ h3 { font-size: 17px; }
   text-align: left;
   font-weight: 500;
   color: var(--ink-3);
-  font-size: 12px;
+  font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 10px 14px;
+  letter-spacing: 0.07em;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--line);
-  background: var(--surface-2);
+  background: transparent;
 }
 .tbl td {
-  padding: 14px;
+  padding: 15px 16px;
   border-bottom: 1px solid var(--line);
   vertical-align: middle;
 }
-.tbl tr:hover td { background: var(--surface-2); }
+.tbl tbody tr { transition: background 0.12s ease; }
+.tbl tbody tr:hover td { background: var(--surface-2); }
 .tbl tr:last-child td { border-bottom: 0; }
+
+/* ---------- Slide-over panel ---------- */
+.slideover-backdrop {
+  position: fixed;
+  inset: 0;
+  background: oklch(0.25 0.03 240 / 0.32);
+  backdrop-filter: blur(2px);
+  z-index: 50;
+  opacity: 0;
+  animation: so-fade 0.18s ease forwards;
+}
+.slideover {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: min(460px, 92vw);
+  background: var(--surface);
+  border-left: 1px solid var(--line);
+  box-shadow: var(--shadow-lg);
+  z-index: 51;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  animation: so-slide 0.24s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.slideover-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--line);
+}
+.slideover-body { padding: 22px; overflow-y: auto; flex: 1; }
+@keyframes so-fade { to { opacity: 1; } }
+@keyframes so-slide { to { transform: translateX(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .slideover, .slideover-backdrop { animation-duration: 0.01ms; }
+}
 
 /* ---------- Misc ---------- */
 .divider { height: 1px; background: var(--line); border: 0; margin: 24px 0; }

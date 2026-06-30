@@ -12,11 +12,10 @@ import {
 } from 'firebase/firestore';
 import { useDoctor } from '@/components/DoctorProvider';
 import { useAuth } from '@/components/AuthProvider';
-import { Icon } from '@/components/ui/Icon';
 import { firestore } from '@/lib/firebase/client';
 import type { AvailabilityTemplateDoc, ConsultationType } from '@/lib/types';
 
-type CellState = 'video' | 'text' | 'both' | 'off';
+type CellState = 'open' | 'off';
 type Block = AvailabilityTemplateDoc['blocks'][number];
 
 // Bookable window: 08:00 → 22:00 in 30-minute steps (last start = 21:30).
@@ -46,38 +45,17 @@ function buildColumns(): Col[] {
   });
 }
 
-const cellStyle = (v: CellState): React.CSSProperties => {
-  if (v === 'off')
-    return { background: 'var(--surface-sunk)', color: 'var(--ink-4)', border: '1px solid var(--line)' };
-  if (v === 'both')
-    return { background: 'var(--primary-tint)', color: 'var(--primary)', border: '1px solid transparent' };
-  if (v === 'video')
-    return { background: 'var(--surface)', color: 'var(--ink)', border: '1px solid var(--line-strong)' };
-  return { background: 'var(--surface)', color: 'var(--ink-2)', border: '1px dashed var(--line-strong)' };
-};
+const cellStyle = (v: CellState): React.CSSProperties =>
+  v === 'open'
+    ? { background: 'var(--primary)', color: 'white', border: '1px solid transparent' }
+    : { background: 'var(--surface-sunk)', color: 'var(--ink-4)', border: '1px solid var(--line)' };
 
-const cycle = (v: CellState): CellState => {
-  if (v === 'off') return 'both';
-  if (v === 'both') return 'video';
-  if (v === 'video') return 'text';
-  return 'off';
-};
+const cycle = (v: CellState): CellState => (v === 'off' ? 'open' : 'off');
 
-const toAllowedTypes = (v: CellState): ConsultationType[] => {
-  if (v === 'both') return ['video', 'text'];
-  if (v === 'video') return ['video'];
-  if (v === 'text') return ['text'];
-  return [];
-};
+const toAllowedTypes = (v: CellState): ConsultationType[] => (v === 'open' ? ['walkin'] : []);
 
-const fromAllowedTypes = (types: ConsultationType[]): CellState => {
-  if (types.includes('video') && types.includes('text')) return 'both';
-  if (types.includes('video')) return 'video';
-  if (types.includes('text')) return 'text';
-  return 'off';
-};
-
-const cellLabel = (v: CellState) => (v === 'off' ? '' : v === 'both' ? 'BOTH' : v);
+const fromAllowedTypes = (types: ConsultationType[]): CellState =>
+  types && types.length ? 'open' : 'off';
 
 // Collapse a column of 30-min cells into contiguous blocks for storage.
 function buildBlocks(cells: CellState[]): Block[] {
@@ -242,18 +220,10 @@ export default function AvailabilityPage() {
 
       <div className="row" style={{ marginBottom: 18, gap: 8 }}>
         <div className="spacer" />
-        <div className="row" style={{ gap: 14, fontSize: 12, color: 'var(--ink-3)', flexWrap: 'wrap' }}>
+        <div className="row" style={{ gap: 16, fontSize: 12, color: 'var(--ink-3)' }}>
           <div className="row" style={{ gap: 6 }}>
-            <span style={{ width: 12, height: 12, borderRadius: 3, background: 'var(--primary-tint)' }} />
-            Both (patient picks video or text)
-          </div>
-          <div className="row" style={{ gap: 6 }}>
-            <span style={{ width: 12, height: 12, borderRadius: 3, background: 'var(--surface)', border: '1px solid var(--line-strong)' }} />
-            Video only
-          </div>
-          <div className="row" style={{ gap: 6 }}>
-            <span style={{ width: 12, height: 12, borderRadius: 3, background: 'var(--surface)', border: '1px dashed var(--line-strong)' }} />
-            Text only
+            <span style={{ width: 12, height: 12, borderRadius: 3, background: 'var(--primary)' }} />
+            Open for walk-ins
           </div>
           <div className="row" style={{ gap: 6 }}>
             <span style={{ width: 12, height: 12, borderRadius: 3, background: 'var(--surface-sunk)', border: '1px solid var(--line)' }} />
@@ -292,17 +262,16 @@ export default function AvailabilityPage() {
                 <button
                   key={col.dayOfWeek}
                   onClick={() => click(ri, ci)}
-                  style={{ height: 34, borderRadius: 6, fontSize: 11, fontWeight: 500, display: 'grid', placeItems: 'center', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em', ...cellStyle(grid[ri][ci]) }}
-                >
-                  {cellLabel(grid[ri][ci])}
-                </button>
+                  aria-label={grid[ri][ci] === 'open' ? 'Open' : 'Closed'}
+                  style={{ height: 34, borderRadius: 6, cursor: 'pointer', transition: 'background .12s ease', ...cellStyle(grid[ri][ci]) }}
+                />
+
               ))}
             </Fragment>
           ))}
         </div>
         <p style={{ color: 'var(--ink-3)', fontSize: 12, marginTop: 14 }}>
-          Click a cell to cycle: Closed → Both → Video only → Text only → Closed. Save when done.{' '}
-          <Icon name="check" size={12} />
+          Tap a slot to open or close it for walk-ins. Changes save automatically.
         </p>
       </div>
     </div>

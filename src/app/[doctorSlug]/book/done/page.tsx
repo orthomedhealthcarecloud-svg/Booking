@@ -49,11 +49,11 @@ export default function BookDonePage() {
       >
         <Icon name="check" size={26} />
       </div>
-      <h1 style={{ marginBottom: 10 }}>Your consultation is booked.</h1>
+      <h1 style={{ marginBottom: 10 }}>Your walk-in is booked.</h1>
       <p style={{ color: 'var(--ink-2)', marginBottom: 32 }}>
-        We&apos;ve emailed your confirmation
-        {appt?.patientEmail ? <> to <strong>{appt.patientEmail}</strong></> : ''}
-        {appt?.type === 'video' ? ' with the Google Meet link and a calendar invite.' : '.'}
+        We&apos;ve emailed a confirmation
+        {appt?.patientEmail ? <> to <strong>{appt.patientEmail}</strong></> : ''} with a calendar
+        invite. Please arrive a few minutes early.
       </p>
 
       <div className="card" style={{ textAlign: 'left', marginBottom: 24 }}>
@@ -77,26 +77,19 @@ export default function BookDonePage() {
             </div>
           </div>
         </div>
-        {appt?.type === 'video' && appt.meetUrl && (
+        {doctor.clinic?.address && (
           <>
             <hr className="divider" />
-            <div style={{ fontSize: 13, color: 'var(--ink-3)', marginBottom: 6 }}>Google Meet link</div>
-            <a href={appt.meetUrl} target="_blank" rel="noreferrer" className="mono" style={{ color: 'var(--primary)', wordBreak: 'break-all' }}>
-              {appt.meetUrl}
-            </a>
+            <div style={{ fontSize: 13, color: 'var(--ink-3)', marginBottom: 6 }}>Clinic</div>
+            <div style={{ fontSize: 14 }}>{doctor.clinic.address}</div>
           </>
         )}
       </div>
 
       <div className="row" style={{ justifyContent: 'center', gap: 10 }}>
-        <Link href={`/${doctor.slug}/dashboard`} className="btn btn-secondary">
+        <Link href={`/${doctor.slug}/dashboard`} className="btn btn-primary">
           Go to dashboard
         </Link>
-        {appt?.type === 'text' && (
-          <Link href={`/${doctor.slug}/chat/${appt.id}`} className="btn btn-primary">
-            Open chat room
-          </Link>
-        )}
       </div>
     </div>
   );

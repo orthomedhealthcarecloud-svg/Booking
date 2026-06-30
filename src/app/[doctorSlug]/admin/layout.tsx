@@ -5,7 +5,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import { useDoctor } from '@/components/DoctorProvider';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
-import { ConsultAlertProvider } from '@/components/admin/ConsultAlert';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const doctor = useDoctor();
@@ -51,11 +50,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <ConsultAlertProvider>
-      <div className="admin">
-        <AdminSidebar />
-        <main className="admin-main">{children}</main>
-      </div>
-    </ConsultAlertProvider>
+    <div className="admin">
+      <AdminSidebar />
+      <main className="admin-main">{children}</main>
+    </div>
   );
 }

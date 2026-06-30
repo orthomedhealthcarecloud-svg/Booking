@@ -15,10 +15,12 @@ export default function BookDetailsPage() {
   const doctor = useDoctor();
   const router = useRouter();
   const { user } = useAuth();
-  const { draft, patch } = useBooking();
+  const { draft, patch, reset } = useBooking();
   const [form, setForm] = useState(draft.form);
   const [files, setFiles] = useState(draft.files);
   const [uploading, setUploading] = useState(false);
+  const [booking, setBooking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!draft.slot) router.replace(`/${doctor.slug}/book/slot`);
@@ -74,10 +76,34 @@ export default function BookDetailsPage() {
   const phoneValid = (form.phone ?? '').replace(/\D/g, '').length >= 10;
   const canContinue = Boolean((form.complaint ?? '').trim()) && emailValid && phoneValid;
 
-  const onContinue = () => {
-    if (!canContinue || uploading) return;
+  const confirmBooking = async () => {
+    if (!canContinue || uploading || booking || !user || !draft.slot) return;
+    setBooking(true);
+    setError(null);
     patch({ form, files });
-    router.push(`/${doctor.slug}/book/pay`);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('/api/appointments/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          doctorId: doctor.id,
+          startMillis: draft.slot.startMillis,
+          endMillis: draft.slot.endMillis,
+          chiefComplaint: form.complaint,
+          notesForDoctor: form.notes,
+          form,
+          documentIds: files.map((f) => f.docId).filter(Boolean),
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Booking failed');
+      const { appointmentId } = (await res.json()) as { appointmentId: string };
+      reset();
+      router.push(`/${doctor.slug}/book/done?id=${appointmentId}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not confirm the appointment');
+      setBooking(false);
+    }
   };
 
   // Upload each selected file to Storage and record it under the patient's documents,
@@ -125,10 +151,11 @@ export default function BookDetailsPage() {
 
   return (
     <div className="patient-wrap" data-screen-label="Book — Details" style={{ maxWidth: 760 }}>
-      <Stepper current={2} />
-      <h1 style={{ marginBottom: 8 }}>Tell us about the visit</h1>
+      <Stepper current={1} />
+      <h1 style={{ marginBottom: 8 }}>Your details</h1>
       <p style={{ color: 'var(--ink-2)', marginBottom: 28 }}>
-        This goes directly to {doctor.name.split(' ').slice(0, 2).join(' ')} before your consultation.
+        Shared with {doctor.name.split(' ').slice(0, 2).join(' ')} before your visit. Walk-in
+        appointments are free.
       </p>
 
       <div className="card">
@@ -298,12 +325,15 @@ export default function BookDetailsPage() {
         </div>
       </div>
 
+      {error && (
+        <p style={{ color: 'var(--danger)', fontSize: 13, marginTop: 16, textAlign: 'right' }}>{error}</p>
+      )}
       <div className="row" style={{ marginTop: 22, justifyContent: 'space-between' }}>
         <button className="btn btn-ghost" onClick={() => router.push(`/${doctor.slug}/book/slot`)}>
           ← Back
         </button>
-        <button className="btn btn-primary" onClick={onContinue} disabled={!canContinue}>
-          Continue to payment
+        <button className="btn btn-primary" onClick={confirmBooking} disabled={!canContinue || booking || uploading}>
+          {booking ? 'Confirming…' : 'Confirm appointment'}
         </button>
       </div>
     </div>

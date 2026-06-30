@@ -144,7 +144,6 @@ export default function PatientDetail() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 22 }}>
           {appts.map((a) => {
-            const joinable = Date.now() >= a.startTime - 5 * 60 * 1000 && Date.now() < a.endTime;
             const sessionDocs = docsByAppt.get(a.id) || [];
             return (
               <div key={a.id} className="card" style={{ padding: 18 }}>
@@ -158,21 +157,12 @@ export default function PatientDetail() {
                         {fmtTime(a.startTime, doctor.timezone)}
                       </div>
                     </div>
-                    <Chip>
-                      <Icon name={a.type === 'video' ? 'video' : 'chat'} size={12} />{' '}
-                      {a.type === 'video' ? 'Video' : 'Text'}
-                    </Chip>
+                    <Chip>Walk-in</Chip>
                     <span style={{ color: 'var(--ink-2)', fontSize: 14 }}>{a.chiefComplaint}</span>
                   </div>
-                  {a.type === 'video' && joinable && a.meetUrl ? (
-                    <a href={a.meetUrl} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm">
-                      <Icon name="video" size={13} /> Join
-                    </a>
-                  ) : (
-                    <Link href={`/${doctor.slug}/admin/appointments/${a.id}`} className="btn btn-ghost btn-sm">
-                      Open <Icon name="chevronRight" size={13} />
-                    </Link>
-                  )}
+                  <Link href={`/${doctor.slug}/admin/appointments/${a.id}`} className="btn btn-ghost btn-sm">
+                    Open <Icon name="chevronRight" size={13} />
+                  </Link>
                 </div>
                 {sessionDocs.length > 0 && (
                   <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--line)' }}>

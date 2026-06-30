@@ -27,7 +27,7 @@ export type BookingDraft = {
 };
 
 const defaultDraft: BookingDraft = {
-  type: 'video',
+  type: 'walkin',
   slot: null,
   form: { name: '', email: '', phone: '', age: '', gender: 'Female', complaint: '', notes: '' },
   files: [],

@@ -1,23 +1,25 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import { useDoctor } from '@/components/DoctorProvider';
 import { Avatar } from '@/components/ui/Avatar';
 import { Chip } from '@/components/ui/Chip';
 import { Icon } from '@/components/ui/Icon';
+import { SlideOver } from '@/components/ui/SlideOver';
 import { subscribeDoctorAppointments } from '@/lib/firestore/appointments';
-import { fmtDate, fmtTime } from '@/lib/format';
+import { fmtDate, fmtDateLong, fmtTime } from '@/lib/format';
 import type { AppointmentDoc } from '@/lib/types';
-
-const LEAD_MS = 5 * 60 * 1000;
 
 export default function AdminConsultations() {
   const doctor = useDoctor();
+  const router = useRouter();
   const { user } = useAuth();
   const [appts, setAppts] = useState<AppointmentDoc[]>([]);
   const [now, setNow] = useState(() => Date.now());
+  const [active, setActive] = useState<AppointmentDoc | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -37,34 +39,6 @@ export default function AdminConsultations() {
     return { upcoming: live, past: done.reverse() };
   }, [appts, now]);
 
-  const JoinCell = ({ a }: { a: AppointmentDoc }) => {
-    const joinable = now >= a.startTime - LEAD_MS && now < a.endTime;
-    if (a.endTime <= now) return <span style={{ color: 'var(--ink-3)', fontSize: 13 }}>Ended</span>;
-    if (!joinable) {
-      return (
-        <button className="btn btn-secondary btn-sm" disabled>
-          Opens {fmtTime(a.startTime, doctor.timezone)}
-        </button>
-      );
-    }
-    if (a.type === 'video') {
-      return a.meetUrl ? (
-        <a href={a.meetUrl} target="_blank" rel="noreferrer" className="btn btn-primary btn-sm">
-          <Icon name="video" size={14} /> Join Meet
-        </a>
-      ) : (
-        <button className="btn btn-secondary btn-sm" disabled title="Meet link not generated">
-          No link
-        </button>
-      );
-    }
-    return (
-      <Link href={`/${doctor.slug}/admin/appointments/${a.id}`} className="btn btn-primary btn-sm">
-        <Icon name="chat" size={14} /> Open chat
-      </Link>
-    );
-  };
-
   const Table = ({ rows, emptyText }: { rows: AppointmentDoc[]; emptyText: string }) => (
     <div className="card" style={{ padding: 0, marginBottom: 26 }}>
       {rows.length === 0 ? (
@@ -75,15 +49,14 @@ export default function AdminConsultations() {
             <tr>
               <th style={{ width: 150 }}>When</th>
               <th>Patient</th>
-              <th>Mode</th>
               <th>Contact</th>
-              <th>Complaint</th>
-              <th style={{ width: 140 }} />
+              <th>Reason</th>
+              <th style={{ width: 110 }} />
             </tr>
           </thead>
           <tbody>
             {rows.map((a) => (
-              <tr key={a.id}>
+              <tr key={a.id} style={{ cursor: 'pointer' }} onClick={() => setActive(a)}>
                 <td>
                   <div style={{ fontSize: 13 }}>{fmtDate(a.startTime, doctor.timezone)}</div>
                   <div className="mono" style={{ fontSize: 12, color: 'var(--ink-3)' }}>
@@ -91,11 +64,7 @@ export default function AdminConsultations() {
                   </div>
                 </td>
                 <td>
-                  <Link
-                    href={`/${doctor.slug}/admin/appointments/${a.id}`}
-                    className="row"
-                    style={{ gap: 10, color: 'inherit', textDecoration: 'none' }}
-                  >
+                  <div className="row" style={{ gap: 10 }}>
                     <Avatar name={a.patientName || 'Patient'} size="sm" />
                     <div>
                       <div style={{ fontWeight: 500 }}>{a.patientName || `#${a.patientId.slice(0, 6)}`}</div>
@@ -104,13 +73,7 @@ export default function AdminConsultations() {
                         {a.patientGender ? ` · ${a.patientGender}` : ''}
                       </div>
                     </div>
-                  </Link>
-                </td>
-                <td>
-                  <Chip>
-                    <Icon name={a.type === 'video' ? 'video' : 'chat'} size={12} />{' '}
-                    {a.type === 'video' ? 'Video' : 'Text'}
-                  </Chip>
+                  </div>
                 </td>
                 <td style={{ fontSize: 12, color: 'var(--ink-2)' }}>
                   {a.patientPhone && <div className="mono">{a.patientPhone}</div>}
@@ -120,8 +83,8 @@ export default function AdminConsultations() {
                   {!a.patientPhone && !a.patientEmail && '—'}
                 </td>
                 <td style={{ color: 'var(--ink-2)' }}>{a.chiefComplaint}</td>
-                <td style={{ textAlign: 'right' }}>
-                  <JoinCell a={a} />
+                <td style={{ textAlign: 'right', color: 'var(--ink-3)' }}>
+                  <Icon name="chevronRight" size={16} />
                 </td>
               </tr>
             ))}
@@ -136,10 +99,7 @@ export default function AdminConsultations() {
       <div className="admin-header">
         <div>
           <h1>Consultations</h1>
-          <div className="sub">
-            All bookings in one place. Join video calls directly — the button opens 5 minutes before
-            each slot.
-          </div>
+          <div className="sub">All walk-in appointments. Open one to view details or prescribe.</div>
         </div>
       </div>
 
@@ -148,6 +108,60 @@ export default function AdminConsultations() {
 
       <h3 style={{ marginBottom: 12 }}>Past</h3>
       <Table rows={past} emptyText="No past consultations yet." />
+
+      <SlideOver open={!!active} title="Appointment" onClose={() => setActive(null)}>
+        {active && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <div className="row" style={{ gap: 14 }}>
+              <Avatar name={active.patientName || 'Patient'} size="lg" />
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 600 }}>{active.patientName || 'Patient'}</div>
+                <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>
+                  {active.patientAge ? `${active.patientAge} y · ` : ''}
+                  {active.patientGender || ''}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 14 }}>
+              <Row k="When" v={`${fmtDateLong(active.startTime, doctor.timezone)}, ${fmtTime(active.startTime, doctor.timezone)}`} />
+              <Row k="Type" v={<Chip>Walk-in</Chip>} />
+              {active.patientPhone && <Row k="Phone" v={<span className="mono">{active.patientPhone}</span>} />}
+              {active.patientEmail && <Row k="Email" v={active.patientEmail} />}
+              <Row k="Status" v={<Chip variant={active.status === 'completed' ? 'ok' : 'default'} dot>{active.status}</Chip>} />
+            </div>
+
+            <div>
+              <div className="eyebrow" style={{ marginBottom: 6 }}>Reason for visit</div>
+              <div style={{ fontSize: 15 }}>{active.chiefComplaint}</div>
+            </div>
+
+            <div className="row" style={{ gap: 10, marginTop: 4 }}>
+              <button
+                className="btn btn-primary btn-full"
+                onClick={() => router.push(`/${doctor.slug}/admin/appointments/${active.id}/prescribe`)}
+              >
+                <Icon name="pill" size={15} /> Write prescription
+              </button>
+              <button
+                className="btn btn-secondary btn-full"
+                onClick={() => router.push(`/${doctor.slug}/admin/appointments/${active.id}`)}
+              >
+                Open
+              </button>
+            </div>
+          </div>
+        )}
+      </SlideOver>
+    </div>
+  );
+}
+
+function Row({ k, v }: { k: string; v: ReactNode }) {
+  return (
+    <div className="row" style={{ justifyContent: 'space-between' }}>
+      <span style={{ color: 'var(--ink-3)' }}>{k}</span>
+      <span style={{ textAlign: 'right' }}>{v}</span>
     </div>
   );
 }

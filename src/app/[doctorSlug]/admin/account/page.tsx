@@ -21,8 +21,6 @@ export default function AccountPage() {
     clinicPhone: doctor.clinic.phone,
     clinicAddress: doctor.clinic.address,
     timezone: doctor.timezone,
-    feeVideo: String(doctor.fee.video),
-    feeText: String(doctor.fee.text),
   });
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
@@ -40,8 +38,6 @@ export default function AccountPage() {
       clinicPhone: doctor.clinic.phone,
       clinicAddress: doctor.clinic.address,
       timezone: doctor.timezone,
-      feeVideo: String(doctor.fee.video),
-      feeText: String(doctor.fee.text),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doctor.id]);
@@ -66,7 +62,6 @@ export default function AccountPage() {
           experienceYears: Number(f.experienceYears) || 0,
           languages: f.languages,
           timezone: f.timezone,
-          fee: { video: Number(f.feeVideo) || 0, text: Number(f.feeText) || 0 },
           clinic: { name: f.clinicName, address: f.clinicAddress, phone: f.clinicPhone },
         }),
       });
@@ -153,22 +148,6 @@ export default function AccountPage() {
             </div>
           </div>
 
-          <div className="card">
-            <h3 style={{ fontSize: 15, marginBottom: 16 }}>Consultation fees</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div className="field">
-                <label>Video consultation (₹)</label>
-                <input className="input mono" value={f.feeVideo} onChange={(e) => set('feeVideo', e.target.value)} />
-              </div>
-              <div className="field">
-                <label>Text consultation (₹)</label>
-                <input className="input mono" value={f.feeText} onChange={(e) => set('feeText', e.target.value)} />
-              </div>
-            </div>
-            <p style={{ color: 'var(--ink-3)', fontSize: 12, marginTop: 14 }}>
-              Setting a video fee to 0 hides video consultations from patients.
-            </p>
-          </div>
         </div>
 
         <aside className="col">
@@ -178,8 +157,7 @@ export default function AccountPage() {
               Integrations
             </div>
             {[
-              ['Google Meet', doctor.hasVideo ? 'Per-booking Meet links' : 'Video disabled', doctor.hasVideo],
-              ['Razorpay', process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ? 'Key configured' : 'Not configured', !!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID],
+              ['Walk-in booking', 'Free, no payment', true],
               ['Firebase', process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ? 'Connected' : 'Not configured', !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID],
             ].map(([n, sub, ok], i) => (
               <div key={String(n)} style={{ padding: '12px 0', borderTop: i === 0 ? 0 : '1px solid var(--line)' }}>

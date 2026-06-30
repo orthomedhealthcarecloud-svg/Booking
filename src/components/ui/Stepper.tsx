@@ -2,7 +2,7 @@ import { Fragment } from 'react';
 
 export function Stepper({
   current,
-  steps = ['Type', 'Time', 'Details', 'Payment'],
+  steps = ['Time', 'Details'],
 }: {
   current: number;
   steps?: string[];

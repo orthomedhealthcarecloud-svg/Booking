@@ -7,6 +7,7 @@ export default function PatientLanding() {
   const doctor = useDoctor();
   const loginHref = `/${doctor.slug}/login`;
   const shortName = doctor.name.split(' ').slice(0, 2).join(' ');
+  const photo = doctor.slug === 'manoj' ? '/face.jpeg' : '/home.jpg';
 
   return (
     <div
@@ -21,7 +22,7 @@ export default function PatientLanding() {
       <div style={{ position: 'relative', background: 'var(--surface-2)', overflow: 'hidden' }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/home.jpg"
+          src={photo}
           alt={doctor.name}
           style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
         />
