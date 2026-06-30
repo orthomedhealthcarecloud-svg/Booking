@@ -54,3 +54,21 @@ Live URL: https://medi-rust-six.vercel.app
 
 ## Verification (do at end)
 - Run through each checklist item; build clean; deploy; confirm live routes 200.
+
+---
+
+## ✅ DONE — verified against checklist
+
+**A. Payments removed** — `/book/pay`, `/book/type`, `api/razorpay/*` deleted (live 404). New `POST /api/appointments/create` (free, atomic slot lock, no payment) — live 401 without auth. Account fee card + Razorpay/Meet integration rows removed; dashboard amount column removed; Today "sync status" no longer shows Razorpay/Meet.
+
+**B. Walk-in only** — `ConsultationType = 'walkin'`; appointments `type: 'walkin'`, `amountPaid: 0`. Booking is Time → Details → Confirm (free). Availability editor cells are Open/Closed (store `allowedTypes: ['walkin']`). Slot page shows any open future slot (no type filter).
+
+**C. Video/Text/Meet/Chat removed** — calendar event created with NO Meet conference (still emails an invite for the in-clinic time). Chat pages/extend/countdown/ConsultAlert deleted. Doctor consultation page = patient summary + reports + Write prescription. Patient "View" = summary + prescription (PDF) + their reports. All "Video/Text" chips → "Walk-in"; Join/Chat buttons → Open/View.
+
+**D. Premium UI** — refined tokens (soft layered shadows, larger radii, refined neutrals), sticky blurred topbar, depth on cards/buttons/inputs, roomier tables w/ subtle row hover, polished empty states. New **SlideOver** panel (right-side, ESC/backdrop close) used as a quick-view on Consultations. Profile dropdown (with logout) retained. Landing = immersive intro + `/face.jpeg` for Dr. Manoj.
+
+**E. Copy trimmed** across booking, dashboard, consultations, account.
+
+**Kept**: prescriptions (per-consultation builder + printable PDF) + medicine catalog, patients list/file, per-session reports/uploads, editable Account, audit log, OTP login, Google Calendar connect.
+
+Build clean (tsc 0, next build ✓). Deployed to https://medi-rust-six.vercel.app — all routes verified.
